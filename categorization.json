@@ -1,0 +1,208 @@
+{
+  "duplicates": {
+    "release-monitor": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/release-monitor",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/release-monitor"
+    ],
+    "packnplay": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/packnplay",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/packnplay"
+    ],
+    "tanzu-cf-architect": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tanzu-cf-architect",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/tanzu-cf-architect"
+    ],
+    "dotfiles": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/dotfiles",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/projects/dotfiles"
+    ]
+  },
+  "categories": {
+    "vmware-vsphere": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vcf-offline-depot",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vcf-fleet-automated-lab-deployment",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tas-vcf",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vmware-scripts",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tas-dominion",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vcf-9x-in-box",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vsphere-architect",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tanzu-validated-solutions",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vcf-9x-lamw"
+    ],
+    "cloud-foundry-tas": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/bosh-operator",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/diego-capacity-analyzer",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/bosh-mock-director",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/diego-capacity-analyzer.wiki",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tanzu-platform-sbom-service",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/diego-thd",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/om",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/bosh-mcp-server",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tanzu-cf-architect",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/thd-tas-platform-engagement",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tas-h2o",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/tanzu-cf-architect"
+    ],
+    "kubernetes": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/release-monitor",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/tkgi-app-tracker",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/repave",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/workspace-tkgi-app-tracker"
+    ],
+    "claude-ai": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/amplifier-bundle-superpowers-obra",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/claudeup-superpowers",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/profiles-private",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/claudeup",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/claudeup-test-repos",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/cc-conductor",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/claudeup.github.io",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/amplifier-claude-preflight",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/amplifier-bundle-superpowers",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/claude-plugins",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/claude-config-dir",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/profiles",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/amplifier-claude",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-mem",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-config-editor",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-statusline",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/awesome-claude-code",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-tresor",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-templates",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-wiki",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-cookbooks",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-tamagotchi",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-viewer",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-tips",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-devcontainer",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/awesome-claude-code-plugins",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-monitoring",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/my-claude-code-setup",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-code-plugin-marketplace",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/projects/claude-orchestrator"
+    ],
+    "platform-automation": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/telmore-platform-automation"
+    ],
+    "golang": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tile-diff",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/packnplay",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/surge",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/samples",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/github-malston-website",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/packnplay"
+    ],
+    "python": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/release-monitor",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/erk",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/serena",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/multi-agent-system",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/release-monitor-malston"
+    ],
+    "javascript": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/humanlayer",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/episodic-memory",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/sudolang",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/sub-agents.directory"
+    ],
+    "docker-containers": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/markitdown",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/workspace-gh-release",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/gh-release"
+    ],
+    "vmware-tanzu": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tanzu-homelab"
+    ],
+    "scripts-utilities": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/powershell-scripts",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/dotfiles-linux",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/npx-tools",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/my-scripts",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/dotfiles",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/projects/dotfiles"
+    ],
+    "homelab-personal": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/homelab-legacy",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/homelab"
+    ],
+    "archived-inactive": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/platform-automation-vsphere",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/prolific",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vsphere-with-tanzu-proof-of-concept-samples",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/shepherd",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tas-icm-paving",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/cks-practice",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/platform-automation-usage",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/shepherd-recipes",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/smith",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/mapbu-library",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/GolangNextjsTemplate",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/service-instance-migrator-for-cloud-foundry",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/platform-automation-pipelines",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vcf-5x-in-box",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tkgi-sizing",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/vcf-in-a-box",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/concourse-docker",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/pivnet-cli",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/prolific-importer",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tanzu-initializr",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/workstation-setup",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/certified-k8s-admin",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/hcx-migration",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/platform-automation-reference",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/platform-automation-pattern",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/takeoff-prompt-manager",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/stock-tracker",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/terminal-notifier-setup",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-crash-course-templates",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/mckays-app-template",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/prompt-library",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/o1-pro-project",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/claude-projects",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/exercise-tracker",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/exercise-tracker-template",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/workout-tracker",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/config-lab-old",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/istio",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/cluster-mgmt",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/tanzuobservability",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/voyager",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/prisma",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/gatekeeper",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/tkgi-pipeline-standards",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/trident-old",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/ns-mgmt-wf",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/workspace-ns-mgmt",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/workspace-params",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/params-malston",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/params",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/config-lab",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/ns-mgmt",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/pipeline-helpers",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/workspace-tkgi-pipeline-standards-fly-script-tools",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/workspace-trident",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/workspace-tkgi-pipeline-standards",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/git/cert-mgmt"
+    ],
+    "uncategorized": [
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/expense-report",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/shared-isoseg-demo",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/kubefirst-personal",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/notes-wiki",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/tile-diff-internal-docs",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/openapi-docs-generator",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/python-learnings",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/workspace/chrome-tabs",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/12-factor-agents",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/agent-skills",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/awesome-llm-apps",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/agents",
+      "/sessions/keen-gracious-wozniak/mnt/markalston/ai/textual-tui-skill"
+    ]
+  },
+  "summary": {
+    "total": 153,
+    "duplicates": 4,
+    "inactive": 57
+  }
+}

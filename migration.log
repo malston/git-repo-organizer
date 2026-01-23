@@ -1,0 +1,339 @@
+[0;32m[2026-01-23 21:16:43][0m =========================================
+[0;32m[2026-01-23 21:16:43][0m Git Repository Reorganization Started
+[0;32m[2026-01-23 21:16:43][0m =========================================
+[0;32m[2026-01-23 21:16:43][0m Creating backup information...
+[0;32m[2026-01-23 21:16:53][0m =========================================
+[0;32m[2026-01-23 21:16:53][0m Git Repository Reorganization Started
+[0;32m[2026-01-23 21:16:53][0m =========================================
+[0;32m[2026-01-23 21:16:53][0m Creating backup information...
+[0;32m[2026-01-23 21:16:53][0m Creating new directory structure...
+[0;32m[2026-01-23 21:16:53][0m Directory structure created
+[0;32m[2026-01-23 21:16:53][0m Moving VMware vSphere repositories...
+[0;32m[2026-01-23 21:16:53][0m Moving tanzu-validated-solutions to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving tas-dominion to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving tas-vcf to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving vcf-9x-in-box to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving vcf-9x-lamw to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving vcf-fleet-automated-lab-deployment to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving vcf-offline-depot to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving vmware-scripts to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving vsphere-architect to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/vsphere/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving VMware Tanzu repositories...
+[0;32m[2026-01-23 21:16:53][0m Moving tanzu-homelab to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/tanzu/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving Cloud Foundry/TAS repositories...
+[0;32m[2026-01-23 21:16:53][0m Moving bosh-mcp-server to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving bosh-mock-director to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving bosh-operator to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving diego-capacity-analyzer to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving diego-capacity-analyzer.wiki to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving diego-thd to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving om to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving tanzu-cf-architect to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving tanzu-platform-sbom-service to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving tas-h2o to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Moving thd-tas-platform-engagement to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/cloud-foundry/
+[0;32m[2026-01-23 21:16:53][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:16:53][0m Removing duplicate: git/tanzu-cf-architect (older version)
+[0;32m[2026-01-23 21:18:15][0m Continuing migration...
+[0;32m[2026-01-23 21:18:15][0m Moving Platform Automation repositories...
+[0;32m[2026-01-23 21:18:15][0m Moving telmore-platform-automation to /sessions/keen-gracious-wozniak/mnt/markalston/code/vmware/platform-automation/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving Kubernetes repositories...
+[0;32m[2026-01-23 21:18:15][0m Moving release-monitor to /sessions/keen-gracious-wozniak/mnt/markalston/code/kubernetes/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving repave to /sessions/keen-gracious-wozniak/mnt/markalston/code/kubernetes/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving tkgi-app-tracker to /sessions/keen-gracious-wozniak/mnt/markalston/code/kubernetes/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving workspace-tkgi-app-tracker to /sessions/keen-gracious-wozniak/mnt/markalston/code/kubernetes/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving Claude AI repositories from workspace...
+[0;32m[2026-01-23 21:18:15][0m Moving amplifier-bundle-superpowers to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving amplifier-bundle-superpowers-obra to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving amplifier-claude to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving amplifier-claude-preflight to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving cc-conductor to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-config-dir to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-plugins to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claudeup to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claudeup-superpowers to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claudeup-test-repos to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claudeup.github.io to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving profiles to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving profiles-private to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving Claude AI repositories from ai...
+[0;32m[2026-01-23 21:18:15][0m Moving awesome-claude-code to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving awesome-claude-code-plugins to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-monitoring to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-plugin-marketplace to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-statusline to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-tamagotchi to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-templates to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-tips to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-tresor to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-viewer to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-code-wiki to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-config-editor to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-cookbooks to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-devcontainer to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-mem to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving my-claude-code-setup to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving claude-orchestrator to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/claude/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving General AI/LLM repositories...
+[0;32m[2026-01-23 21:18:15][0m Moving 12-factor-agents to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving agent-skills to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving agents to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving awesome-llm-apps to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving episodic-memory to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving humanlayer to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving multi-agent-system to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving serena to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving sub-agents.directory to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:15][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:15][0m Moving sudolang to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving textual-tui-skill to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving chrome-tabs to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving openapi-docs-generator to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving Golang repositories...
+[0;32m[2026-01-23 21:18:16][0m Moving github-malston-website to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/golang/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving packnplay to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/golang/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving samples to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/golang/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving surge to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/golang/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving tile-diff to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/golang/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving Python repositories...
+[0;32m[2026-01-23 21:18:16][0m Moving erk to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/python/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving python-learnings to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/python/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving release-monitor to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/python/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving release-monitor-malston to /sessions/keen-gracious-wozniak/mnt/markalston/code/languages/python/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving Docker repositories...
+[0;32m[2026-01-23 21:18:16][0m Moving markitdown to /sessions/keen-gracious-wozniak/mnt/markalston/code/infrastructure/docker/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving gh-release to /sessions/keen-gracious-wozniak/mnt/markalston/code/infrastructure/docker/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workspace-gh-release to /sessions/keen-gracious-wozniak/mnt/markalston/code/infrastructure/docker/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving Homelab repositories...
+[0;32m[2026-01-23 21:18:16][0m Moving homelab to /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/homelab/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving homelab-legacy to /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/homelab/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving Scripts and utilities...
+[0;32m[2026-01-23 21:18:16][0m Moving dotfiles-linux to /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/scripts/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving my-scripts to /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/scripts/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving npx-tools to /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/scripts/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving powershell-scripts to /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/scripts/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving dotfiles to /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/scripts/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[1;33m[2026-01-23 21:18:16] WARNING:[0m Already exists: /sessions/keen-gracious-wozniak/mnt/markalston/code/personal/scripts/dotfiles - Skipping
+[0;32m[2026-01-23 21:18:16][0m Moving uncategorized repositories...
+[0;32m[2026-01-23 21:18:16][0m Moving expense-report to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving kubefirst-personal to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving notes-wiki to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving shared-isoseg-demo to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving tile-diff-internal-docs to /sessions/keen-gracious-wozniak/mnt/markalston/code/ai-ml/llm/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Archiving inactive repositories...
+[0;32m[2026-01-23 21:18:16][0m Moving platform-automation-vsphere to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving prolific to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving vsphere-with-tanzu-proof-of-concept-samples to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving shepherd to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving tas-icm-paving to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving cks-practice to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving platform-automation-usage to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving shepherd-recipes to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving smith to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving mapbu-library to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving GolangNextjsTemplate to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving service-instance-migrator-for-cloud-foundry to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving platform-automation-pipelines to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving vcf-5x-in-box to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving tkgi-sizing to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving vcf-in-a-box to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving concourse-docker to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving pivnet-cli to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving prolific-importer to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving tanzu-initializr to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workstation-setup to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving certified-k8s-admin to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving hcx-migration to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving platform-automation-reference to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving platform-automation-pattern to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving takeoff-prompt-manager to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving stock-tracker to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving terminal-notifier-setup to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving claude-crash-course-templates to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving mckays-app-template to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving prompt-library to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving o1-pro-project to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving claude-projects to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving exercise-tracker to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving exercise-tracker-template to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workout-tracker to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving config-lab-old to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving istio to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving cluster-mgmt to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving tanzuobservability to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving voyager to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving prisma to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving gatekeeper to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving tkgi-pipeline-standards to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving trident-old to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving ns-mgmt-wf to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workspace-ns-mgmt to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workspace-params to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving params-malston to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving params to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving config-lab to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving ns-mgmt to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving pipeline-helpers to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workspace-tkgi-pipeline-standards-fly-script-tools to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workspace-trident to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving workspace-tkgi-pipeline-standards to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Moving cert-mgmt to /sessions/keen-gracious-wozniak/mnt/markalston/code/archived/
+[0;32m[2026-01-23 21:18:16][0m   ✓ Moved successfully
+[0;32m[2026-01-23 21:18:16][0m Attempting to clean up duplicates...
+[0;32m[2026-01-23 21:18:16][0m Removing duplicate: ai/packnplay
+[1;33m[2026-01-23 21:18:16] WARNING:[0m Could not remove ai/packnplay (permission denied - you can remove manually)
+[0;32m[2026-01-23 21:18:16][0m Removing duplicate: git/tanzu-cf-architect
+[1;33m[2026-01-23 21:18:18] WARNING:[0m Could not remove git/tanzu-cf-architect (permission denied - you can remove manually)
+[0;32m[2026-01-23 21:18:18][0m =========================================
+[0;32m[2026-01-23 21:18:18][0m Migration Complete!
+[0;32m[2026-01-23 21:18:18][0m =========================================
+[0;32m[2026-01-23 21:19:04][0m Total repositories in new structure: 158
+[0;32m[2026-01-23 21:19:04][0m New structure: /sessions/keen-gracious-wozniak/mnt/markalston/code
+[0;32m[2026-01-23 21:19:04][0m Migration log: /sessions/keen-gracious-wozniak/migration.log
