@@ -123,6 +123,9 @@ class SyncPlan:
     symlinks_to_create: list[tuple[str, str, str]]  # (workspace, category, repo)
     symlinks_to_update: list[tuple[str, str, str]]  # (workspace, category, repo)
     symlinks_to_remove: list[tuple[str, str, str]]  # (workspace, category, repo)
+    non_symlink_dirs: list[tuple[str, str, str]] = field(
+        default_factory=list
+    )  # (workspace, category, dir_name)
 
     @property
     def has_changes(self) -> bool:
@@ -134,3 +137,8 @@ class SyncPlan:
             or self.symlinks_to_update
             or self.symlinks_to_remove
         )
+
+    @property
+    def has_warnings(self) -> bool:
+        """Check if there are any warnings to display."""
+        return bool(self.non_symlink_dirs)

@@ -268,6 +268,77 @@ class TestStatus:
         assert "Symlinks to create" in result.output
         assert "my-repo" in result.output
 
+    def test_root_category_display_without_dot(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Root category repos display without './' in path."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should show "workspace/my-repo" not "workspace/./my-repo"
+        assert "workspace/my-repo" in result.output
+        assert "workspace/./my-repo" not in result.output
+
+    def test_orphan_message_suggests_prune(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Status message mentions --prune when orphans exist."""
+        # Create orphan symlink
+        (test_env["workspace"] / "orphan").symlink_to(test_env["code"])
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Orphaned symlinks" in result.output
+        assert "--prune" in result.output
+
+    def test_shows_non_symlink_directories(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Shows directories in workspace that are not symlinks."""
+        # Create a real directory (not a symlink) in workspace
+        (test_env["workspace"] / "direct-clone" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Non-symlink directories" in result.output
+        assert "direct-clone" in result.output
+
 
 class TestApply:
     """Tests for apply command."""

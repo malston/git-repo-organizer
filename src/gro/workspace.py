@@ -68,6 +68,48 @@ def scan_workspace_symlinks(workspace_path: Path) -> dict[str, list[str]]:
     return result
 
 
+def scan_workspace_non_symlinks(workspace_path: Path) -> dict[str, list[str]]:
+    """
+    Scan a workspace directory for non-symlink directories (potential direct clones).
+
+    Args:
+        workspace_path: Path to the workspace directory.
+
+    Returns:
+        Dict mapping category paths to lists of directory names that are not symlinks.
+        Category "." means directories at workspace root.
+    """
+    if not workspace_path.exists():
+        return {}
+
+    result: dict[str, list[str]] = {}
+
+    def scan_dir(dir_path: Path, category_prefix: str) -> None:
+        """Recursively scan directory for non-symlink directories."""
+        if not dir_path.exists():
+            return
+
+        for item in dir_path.iterdir():
+            if item.is_symlink():
+                # Skip symlinks - they're managed by gro
+                continue
+            elif item.is_dir():
+                # Check if this looks like a repo (has .git)
+                if (item / ".git").exists():
+                    # This is a non-symlink repo directory
+                    cat_path = category_prefix if category_prefix else "."
+                    if cat_path not in result:
+                        result[cat_path] = []
+                    result[cat_path].append(item.name)
+                else:
+                    # Recurse into subdirectory (category folder)
+                    new_prefix = f"{category_prefix}/{item.name}" if category_prefix else item.name
+                    scan_dir(item, new_prefix)
+
+    scan_dir(workspace_path, "")
+    return result
+
+
 def get_symlink_path(workspace_path: Path, category_path: str, repo_name: str) -> Path:
     """
     Get the full path for a symlink.
@@ -284,12 +326,21 @@ def create_sync_plan(config: Config) -> SyncPlan:
                 if repo_name not in configured_repos:
                     symlinks_to_remove.append((ws_name, cat_path, repo_name))
 
+    # Check for non-symlink directories in workspaces
+    non_symlink_dirs: list[tuple[str, str, str]] = []
+    for ws_name, workspace in config.workspaces.items():
+        non_symlinks = scan_workspace_non_symlinks(workspace.path)
+        for cat_path, dir_names in non_symlinks.items():
+            for dir_name in dir_names:
+                non_symlink_dirs.append((ws_name, cat_path, dir_name))
+
     return SyncPlan(
         repos_to_add=repos_to_add,
         repos_missing=repos_missing,
         symlinks_to_create=symlinks_to_create,
         symlinks_to_update=symlinks_to_update,
         symlinks_to_remove=symlinks_to_remove,
+        non_symlink_dirs=non_symlink_dirs,
     )
 
 

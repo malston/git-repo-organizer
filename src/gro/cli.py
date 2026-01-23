@@ -27,6 +27,13 @@ from gro.workspace import (
 console = Console()
 
 
+def format_symlink_path(ws_name: str, cat_path: str, repo_name: str) -> str:
+    """Format a symlink path for display, omitting './' for root category."""
+    if cat_path == ".":
+        return f"{ws_name}/{repo_name}"
+    return f"{ws_name}/{cat_path}/{repo_name}"
+
+
 class Context:
     """Shared context for CLI commands."""
 
@@ -200,25 +207,34 @@ def status(ctx: Context) -> None:
     if plan.symlinks_to_create:
         console.print("\n[bold]Symlinks to create:[/bold]")
         for ws_name, cat_path, repo_name in plan.symlinks_to_create:
-            console.print(f"  [green]+[/green] {ws_name}/{cat_path}/{repo_name}")
+            console.print(f"  [green]+[/green] {format_symlink_path(ws_name, cat_path, repo_name)}")
 
     # Show symlinks to update
     if plan.symlinks_to_update:
         console.print("\n[bold]Symlinks to update:[/bold]")
         for ws_name, cat_path, repo_name in plan.symlinks_to_update:
-            console.print(f"  [blue]~[/blue] {ws_name}/{cat_path}/{repo_name}")
+            console.print(f"  [blue]~[/blue] {format_symlink_path(ws_name, cat_path, repo_name)}")
 
     # Show orphaned symlinks
     if plan.symlinks_to_remove:
         console.print("\n[bold]Orphaned symlinks (not in config):[/bold]")
         for ws_name, cat_path, repo_name in plan.symlinks_to_remove:
-            console.print(f"  [red]-[/red] {ws_name}/{cat_path}/{repo_name}")
+            console.print(f"  [red]-[/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
+
+    # Show non-symlink directories
+    if plan.non_symlink_dirs:
+        console.print("\n[bold]Non-symlink directories in workspace:[/bold]")
+        for ws_name, cat_path, dir_name in plan.non_symlink_dirs:
+            console.print(f"  [yellow]?[/yellow] {format_symlink_path(ws_name, cat_path, dir_name)}")
 
     # Summary
-    if not plan.has_changes:
+    if not plan.has_changes and not plan.has_warnings:
         console.print("\n[green]Everything is in sync![/green]")
-    else:
-        console.print("\n[yellow]Run 'gro apply' to sync symlinks[/yellow]")
+    elif plan.has_changes:
+        if plan.symlinks_to_remove:
+            console.print("\n[yellow]Run 'gro apply --prune' to sync symlinks[/yellow]")
+        else:
+            console.print("\n[yellow]Run 'gro apply' to sync symlinks[/yellow]")
 
 
 @main.command()
@@ -263,17 +279,17 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
     if plan.symlinks_to_create:
         console.print("\n[bold]Creating symlinks:[/bold]")
         for ws_name, cat_path, repo_name in plan.symlinks_to_create:
-            console.print(f"  [green]+[/green] {ws_name}/{cat_path}/{repo_name}")
+            console.print(f"  [green]+[/green] {format_symlink_path(ws_name, cat_path, repo_name)}")
 
     if plan.symlinks_to_update:
         console.print("\n[bold]Updating symlinks:[/bold]")
         for ws_name, cat_path, repo_name in plan.symlinks_to_update:
-            console.print(f"  [blue]~[/blue] {ws_name}/{cat_path}/{repo_name}")
+            console.print(f"  [blue]~[/blue] {format_symlink_path(ws_name, cat_path, repo_name)}")
 
     if prune and plan.symlinks_to_remove:
         console.print("\n[bold]Removing orphaned symlinks:[/bold]")
         for ws_name, cat_path, repo_name in plan.symlinks_to_remove:
-            console.print(f"  [red]-[/red] {ws_name}/{cat_path}/{repo_name}")
+            console.print(f"  [red]-[/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
 
     if ctx.dry_run:
         console.print("\n[blue]Dry run - no changes made[/blue]")
