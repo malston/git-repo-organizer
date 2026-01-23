@@ -1,0 +1,642 @@
+# ABOUTME: Integration tests for gro CLI commands.
+# ABOUTME: Tests init, status, apply, sync, and add commands.
+"""Tests for gro.cli."""
+
+from pathlib import Path
+
+import pytest
+from click.testing import CliRunner
+
+from gro.cli import main
+from gro.config import load_config, save_config
+from gro.models import Category, Config, Workspace
+
+
+@pytest.fixture
+def runner() -> CliRunner:
+    """Create a CLI runner."""
+    return CliRunner()
+
+
+@pytest.fixture
+def test_env(tmp_path: Path) -> dict[str, Path]:
+    """Create test environment with code and workspace directories."""
+    code_path = tmp_path / "code"
+    code_path.mkdir()
+
+    workspace_path = tmp_path / "workspace"
+    workspace_path.mkdir()
+
+    config_path = tmp_path / "config.yaml"
+
+    return {
+        "code": code_path,
+        "workspace": workspace_path,
+        "config": config_path,
+    }
+
+
+class TestMain:
+    """Tests for main CLI group."""
+
+    def test_help(self, runner: CliRunner) -> None:
+        """Shows help message."""
+        result = runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        assert "GRO - Git Repository Organizer" in result.output
+
+    def test_dry_run_flag(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Dry run flag is passed to context."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--dry-run",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Would save config" in result.output
+
+
+class TestInit:
+    """Tests for init command."""
+
+    def test_creates_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Creates config file."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+            ],
+        )
+        assert result.exit_code == 0
+        assert test_env["config"].exists()
+        assert "Config saved to" in result.output
+
+    def test_creates_code_dir(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Creates code directory if it doesn't exist."""
+        new_code = test_env["code"].parent / "new_code"
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(new_code),
+                "--workspace",
+                str(test_env["workspace"]),
+            ],
+        )
+        assert result.exit_code == 0
+        assert new_code.exists()
+
+    def test_multiple_workspaces(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Supports multiple workspace directories."""
+        ws2 = test_env["workspace"].parent / "workspace2"
+        ws2.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--workspace",
+                str(ws2),
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        assert len(config.workspaces) == 2
+
+    def test_scan_repos_non_interactive(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Scans repos in non-interactive mode."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Found 1 repositories" in result.output
+
+        config = load_config(test_env["config"])
+        assert "my-repo" in config.all_repos()
+
+    def test_warns_on_missing_dirs(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows warnings for missing directories."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"].parent / "nonexistent"),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Warning:" in result.output
+
+
+class TestStatus:
+    """Tests for status command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_all_synced(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows synced message when nothing to do."""
+        # Create config
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Everything is in sync" in result.output
+
+    def test_shows_uncategorized(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows uncategorized repos."""
+        (test_env["code"] / "uncategorized-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Uncategorized repos" in result.output
+        assert "uncategorized-repo" in result.output
+
+    def test_shows_missing_repos(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows repos in config but not in code."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["missing-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Missing repos" in result.output
+        assert "missing-repo" in result.output
+
+    def test_shows_symlinks_to_create(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows symlinks that need to be created."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Symlinks to create" in result.output
+        assert "my-repo" in result.output
+
+    def test_root_category_display_without_dot(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Root category repos display without './' in path."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should show "workspace/my-repo" not "workspace/./my-repo"
+        assert "workspace/my-repo" in result.output
+        assert "workspace/./my-repo" not in result.output
+
+    def test_orphan_message_suggests_prune(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Status message mentions --prune when orphans exist."""
+        # Create orphan symlink
+        (test_env["workspace"] / "orphan").symlink_to(test_env["code"])
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Orphaned symlinks" in result.output
+        assert "--prune" in result.output
+
+    def test_shows_non_symlink_directories(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Shows directories in workspace that are not symlinks."""
+        # Create a real directory (not a symlink) in workspace
+        (test_env["workspace"] / "direct-clone" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Non-symlink directories" in result.output
+        assert "direct-clone" in result.output
+
+
+class TestApply:
+    """Tests for apply command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_nothing_to_do(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows message when nothing to do."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Nothing to do" in result.output
+
+    def test_creates_symlinks(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Creates symlinks from config."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Created 1 symlinks" in result.output
+        assert (test_env["workspace"] / "my-repo").is_symlink()
+
+    def test_creates_category_dirs(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Creates category directories for symlinks."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["vmware/vsphere"] = Category(path="vmware/vsphere", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (test_env["workspace"] / "vmware" / "vsphere" / "my-repo").is_symlink()
+
+    def test_dry_run_no_changes(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Dry run doesn't create symlinks."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--dry-run",
+                "apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Dry run" in result.output
+        assert not (test_env["workspace"] / "my-repo").exists()
+
+    def test_prune_orphans(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Removes orphaned symlinks with --prune."""
+        # Create orphan symlink
+        (test_env["workspace"] / "orphan").symlink_to(test_env["code"])
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+                "--prune",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Removed 1 symlinks" in result.output
+        assert not (test_env["workspace"] / "orphan").exists()
+
+
+class TestSync:
+    """Tests for sync command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "sync",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_all_categorized(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows message when all repos categorized."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "sync",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "All repos are categorized" in result.output
+
+    def test_adds_uncategorized_non_interactive(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Adds uncategorized repos in non-interactive mode."""
+        (test_env["code"] / "new-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "sync",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "new-repo" in result.output
+        assert "Added 1 repos to config" in result.output
+
+        # Verify config was updated
+        config = load_config(test_env["config"])
+        assert "new-repo" in config.all_repos()
+
+
+class TestAdd:
+    """Tests for add command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "add",
+                "some-repo",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_repo_not_found(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if repo doesn't exist."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "add",
+                "nonexistent",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Repo not found" in result.output
+
+    def test_not_git_repo(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if directory is not a git repo."""
+        (test_env["code"] / "not-git").mkdir()
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "add",
+                "not-git",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Not a git repo" in result.output
+
+    def test_adds_repo_non_interactive(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Adds repo in non-interactive mode."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "add",
+                "my-repo",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Added my-repo" in result.output
+
+        # Verify config was updated
+        config = load_config(test_env["config"])
+        assert "my-repo" in config.all_repos()
+
+    def test_adopts_repo_from_workspace(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Adopts a repo that exists in workspace but not in code."""
+        # Create repo directly in workspace (not a symlink)
+        (test_env["workspace"] / "direct-repo" / ".git").mkdir(parents=True)
+        (test_env["workspace"] / "direct-repo" / "README.md").write_text("test")
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "add",
+                "direct-repo",
+            ],
+            input="y\n",  # Confirm move
+        )
+        assert result.exit_code == 0
+
+        # Verify repo was moved to code directory
+        assert (test_env["code"] / "direct-repo" / ".git").exists()
+        assert (test_env["code"] / "direct-repo" / "README.md").exists()
+        # Original should be gone (or be a symlink after apply)
+        assert not (test_env["workspace"] / "direct-repo" / ".git").is_dir() or \
+               (test_env["workspace"] / "direct-repo").is_symlink()
+
+        # Verify config was updated
+        config = load_config(test_env["config"])
+        assert "direct-repo" in config.all_repos()
