@@ -1,203 +1,136 @@
-# Git Repository Organizer
+# gro - Git Repository Organizer
 
-A collection of scripts and tools to analyze, categorize, and reorganize git repositories across multiple directories.
+A CLI tool for managing git repositories with symlinks via YAML configuration.
 
 ## Overview
 
-This toolset was created to help organize 150+ git repositories scattered across `~/workspace`, `~/ai`, `~/git`, and `~/projects` into a clean, categorized structure in `~/code/`.
+gro helps you organize your git repositories by:
 
-## Files
+- Keeping all repos cloned flat in a single `code` directory
+- Creating symlinks in workspace directories organized by categories
+- Managing multiple workspaces with independent category structures
 
-### Scripts
-
-1. **analyze_repos.sh**
-   - Analyzes all git repositories in specified directories
-   - Extracts metadata: last commit date, primary language, remote URL
-   - Outputs: `repo_analysis.csv`
-   - Usage: `./analyze_repos.sh`
-
-2. **analyze_duplicates.py**
-   - Python script that identifies duplicate repositories
-   - Categorizes repositories by technology/purpose
-   - Identifies inactive repositories (180+ days since last commit)
-   - Outputs: Detailed console report + `categorization.json`
-   - Usage: `python3 analyze_duplicates.py`
-
-3. **migrate_repos.sh**
-   - Main migration script (initial version)
-   - Creates new directory structure
-   - Moves repositories to appropriate categories
-   - Removes duplicates
-   - Archives inactive repositories
-   - Usage: `./migrate_repos.sh`
-
-4. **continue_migration.sh**
-   - Continuation script (improved version)
-   - More resilient to permission errors
-   - Completes any interrupted migrations
-   - Usage: `./continue_migration.sh`
-
-### Data Files
-
-1. **repo_analysis.csv**
-   - Complete analysis of all repositories
-   - Columns: repo_path, repo_name, last_commit_date, days_since_commit, primary_language, remote_url, directory
-
-2. **categorization.json**
-   - Structured data of repository categorization
-   - Contains: duplicates, categories, summary statistics
-
-3. **migration.log**
-   - Detailed log of migration operations
-   - Timestamped entries for all move operations
-   - Records warnings and errors
-
-4. **reorganization_plan.md**
-   - Detailed plan document
-   - Explains proposed directory structure
-   - Lists all duplicates and actions to take
-
-## Directory Structure Created
-
-```
-~/code/
-├── vmware/
-│   ├── vsphere/
-│   ├── tanzu/
-│   ├── cloud-foundry/
-│   └── platform-automation/
-├── kubernetes/
-├── ai-ml/
-│   ├── claude/
-│   └── llm/
-├── languages/
-│   ├── golang/
-│   ├── python/
-│   └── javascript/
-├── infrastructure/
-│   ├── terraform/
-│   └── docker/
-├── personal/
-│   ├── homelab/
-│   └── scripts/
-└── archived/
-```
-
-## Categorization Logic
-
-### Technology Categories
-
-- **VMware**: vsphere, vcf, vmware, esxi, hcx, tanzu
-- **Cloud Foundry**: tas, diego, bosh, cf, cloud-foundry, pivotal
-- **Kubernetes**: k8s, kubernetes, tkgi, kubectl, istio, gatekeeper
-- **Claude AI**: claude, anthropic, amplifier
-- **Languages**: Detected from go.mod, package.json, requirements.txt, etc.
-- **Scripts/Utilities**: dotfiles, scripts, tools, utilities, setup
-
-### Inactive Threshold
-
-Repositories with no commits in 180+ days are moved to `~/code/archived/`
-
-## Usage Examples
-
-### Analyze Current State
+## Installation
 
 ```bash
-# Run analysis on current repositories
-./analyze_repos.sh
+# Clone the repo
+git clone https://github.com/yourusername/git-repo-organizer.git
+cd git-repo-organizer
 
-# Generate categorization and duplicate report
-python3 analyze_duplicates.py
+# Install with uv
+uv sync
+
+# Or install globally
+uv tool install .
 ```
 
-### Run Migration
+## Quick Start
 
 ```bash
-# First time migration
-./migrate_repos.sh
+# Initialize configuration
+gro init --code ~/code --workspace ~/workspace
 
-# Or use the improved continuation script
-./continue_migration.sh
+# Scan existing repos and categorize them
+gro sync
+
+# Create symlinks from config
+gro apply
+
+# Check status
+gro status
 ```
 
-### Review Results
+## Configuration
+
+Config file is stored at `~/.config/gro/config.yaml`:
+
+```yaml
+code: ~/code
+
+workspaces:
+  - ~/workspace
+  - ~/projects
+
+workspace:
+  .: [repo1, repo2] # Symlinks at workspace root
+  vmware:
+    - vsphere-automation
+    - govmomi
+  vmware/vsphere:
+    - pyvmomi
+
+projects:
+  personal: [my-app, dotfiles]
+```
+
+## Commands
+
+### `gro init`
+
+Initialize configuration with code and workspace directories.
 
 ```bash
-# Check migration log
-tail -f migration.log
-
-# View repository analysis
-less repo_analysis.csv
-
-# Check categorization
-cat categorization.json | jq
+gro init --code ~/code --workspace ~/workspace
+gro init --scan  # Also scan and categorize existing repos
 ```
 
-## Customization
+### `gro status`
 
-### Modify Source Directories
-
-Edit `analyze_repos.sh` line 45-51:
-```bash
-for dir in workspace ai git projects; do
-    repo_base="/path/to/base/$dir"
-    # ...
-done
-```
-
-### Change Categorization Rules
-
-Edit `analyze_duplicates.py` lines 33-78 to adjust category definitions and matching logic.
-
-### Adjust Inactive Threshold
-
-Edit `analyze_duplicates.py` line 25 to change the inactive threshold (currently 180 days):
-```python
-if days_since >= 180:  # Change this value
-```
-
-## Results from Last Run
-
-- **Total Repositories**: 153
-- **Duplicates Found**: 4 repository names (2 true duplicates)
-- **Inactive Archived**: 59 repositories
-- **Active Organized**: 94 repositories
-- **Migration Status**: ✓ Complete
-
-## Maintenance
-
-### Re-run Analysis
-
-To analyze your repositories again:
-```bash
-./analyze_repos.sh
-python3 analyze_duplicates.py
-```
-
-### Find New Duplicates
+Show sync status of repositories and symlinks.
 
 ```bash
-python3 analyze_duplicates.py | grep -A 10 "DUPLICATE REPOSITORIES"
+gro status
 ```
 
-### Check for New Inactive Repos
+### `gro apply`
+
+Create/update symlinks based on configuration.
 
 ```bash
-python3 analyze_duplicates.py | grep -A 5 "ARCHIVED INACTIVE"
+gro apply           # Create missing symlinks
+gro apply --prune   # Also remove orphaned symlinks
+gro apply -n        # Dry run - preview changes
 ```
 
-## Notes
+### `gro sync`
 
-- Scripts use `/sessions/keen-gracious-wozniak/mnt/markalston` as base path
-- Modify paths if running from different location
-- Migration scripts are idempotent - safe to run multiple times
-- Always backup before running migration scripts
-- Review `migration.log` for detailed operation history
+Add uncategorized repos from code directory to config.
+
+```bash
+gro sync                    # Interactive categorization
+gro sync --non-interactive  # Add all to root category
+```
+
+### `gro add <repo>`
+
+Add a specific repository to a category.
+
+```bash
+gro add my-new-repo
+```
+
+## Common Options
+
+- `--config/-c PATH` - Use custom config file
+- `--dry-run/-n` - Preview changes without making them
+- `--non-interactive` - Use defaults without prompts
+
+## Development
+
+```bash
+# Install dev dependencies
+make dev
+
+# Run tests
+make test
+
+# Run all checks (lint, typecheck, test)
+make check
+
+# Format code
+make format
+```
 
 ## License
 
-Created for personal use. Modify as needed.
-
-## Author
-
-Generated by Claude AI (Anthropic) - January 23, 2026
+MIT
