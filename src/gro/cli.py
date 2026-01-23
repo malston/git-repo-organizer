@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import click
@@ -22,6 +23,7 @@ from gro.workspace import (
     cleanup_empty_directories,
     create_sync_plan,
     scan_code_dir,
+    scan_workspace_non_symlinks,
 )
 
 console = Console()
@@ -32,6 +34,29 @@ def format_symlink_path(ws_name: str, cat_path: str, repo_name: str) -> str:
     if cat_path == ".":
         return f"{ws_name}/{repo_name}"
     return f"{ws_name}/{cat_path}/{repo_name}"
+
+
+def find_repo_in_workspaces(
+    config: Config, repo_name: str
+) -> tuple[Path, str, str] | None:
+    """
+    Find a non-symlink repo directory in any workspace.
+
+    Args:
+        config: The configuration.
+        repo_name: Name of the repo to find.
+
+    Returns:
+        Tuple of (path, workspace_name, category_path) if found, None otherwise.
+    """
+    for ws_name, workspace in config.workspaces.items():
+        non_symlinks = scan_workspace_non_symlinks(workspace.path)
+        for cat_path, dir_names in non_symlinks.items():
+            if repo_name in dir_names:
+                if cat_path == ".":
+                    return (workspace.path / repo_name, ws_name, cat_path)
+                return (workspace.path / cat_path / repo_name, ws_name, cat_path)
+    return None
 
 
 class Context:
@@ -63,7 +88,10 @@ class Context:
 pass_context = click.make_pass_decorator(Context, ensure=True)
 
 
-@click.group()
+CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
+
+@click.group(context_settings=CONTEXT_SETTINGS)
 @click.option(
     "--config",
     "-c",
@@ -382,18 +410,38 @@ def add(ctx: Context, repo_name: str) -> None:
     """Add a repository to a category.
 
     Interactively select workspace and category for the repo.
+    If the repo exists in a workspace but not in the code directory,
+    offers to move it to the code directory first.
     """
     if not ctx.has_config():
         console.print(f"[red]Config not found:[/red] {ctx.config_path}")
         raise SystemExit(1)
 
     config = ctx.config
+    suggested_ws: str | None = None
+    suggested_cat: str | None = None
 
-    # Check repo exists
+    # Check repo exists in code directory
     repo_path = config.code_path / repo_name
     if not repo_path.exists():
-        console.print(f"[red]Repo not found:[/red] {repo_path}")
-        raise SystemExit(1)
+        # Check if it exists in a workspace as a non-symlink directory
+        found = find_repo_in_workspaces(config, repo_name)
+        if found:
+            workspace_path, suggested_ws, suggested_cat = found
+            console.print(f"Found '{repo_name}' in workspace: {workspace_path}")
+            console.print(f"It should be moved to: {repo_path}")
+            if click.confirm("Move to code directory?"):
+                if ctx.dry_run:
+                    console.print(f"[blue]Would move {workspace_path} -> {repo_path}[/blue]")
+                else:
+                    shutil.move(str(workspace_path), str(repo_path))
+                    console.print(f"[green]Moved to {repo_path}[/green]")
+            else:
+                console.print("[yellow]Aborted[/yellow]")
+                return
+        else:
+            console.print(f"[red]Repo not found:[/red] {repo_path}")
+            raise SystemExit(1)
 
     if not (repo_path / ".git").exists():
         console.print(f"[red]Not a git repo:[/red] {repo_path}")
@@ -409,15 +457,16 @@ def add(ctx: Context, repo_name: str) -> None:
             return
 
     if ctx.non_interactive:
-        # Add to root of first workspace
+        # Use suggested workspace/category or default to root of first workspace
         if config.workspaces:
-            ws_name = next(iter(config.workspaces.keys()))
+            ws_name = suggested_ws or next(iter(config.workspaces.keys()))
             workspace = config.workspaces[ws_name]
-            category = workspace.get_or_create_category(".")
+            cat_path = suggested_cat or "."
+            category = workspace.get_or_create_category(cat_path)
             category.repos.append(repo_name)
-            console.print(f"Added {repo_name} to {ws_name}/.")
+            console.print(f"Added {repo_name} to {format_symlink_path(ws_name, cat_path, repo_name)}")
     else:
-        categorize_repo_interactive(config, repo_name)
+        categorize_repo_interactive(config, repo_name, suggested_ws, suggested_cat)
 
     if ctx.dry_run:
         console.print("[blue]Dry run - config not saved[/blue]")
@@ -427,13 +476,20 @@ def add(ctx: Context, repo_name: str) -> None:
         console.print("[yellow]Run 'gro apply' to create symlinks[/yellow]")
 
 
-def categorize_repo_interactive(config: Config, repo_name: str) -> bool:
+def categorize_repo_interactive(
+    config: Config,
+    repo_name: str,
+    suggested_ws: str | None = None,
+    suggested_cat: str | None = None,
+) -> bool:
     """
     Interactively categorize a repo.
 
     Args:
         config: The configuration to update.
         repo_name: Name of the repo.
+        suggested_ws: Suggested workspace name (used as default).
+        suggested_cat: Suggested category path (used as default).
 
     Returns:
         True if repo was categorized, False if skipped.
@@ -450,11 +506,15 @@ def categorize_repo_interactive(config: Config, repo_name: str) -> bool:
         ws_name = ws_names[0]
     else:
         console.print("Workspaces:")
+        default_ws_idx = "1"
         for i, name in enumerate(ws_names, 1):
-            console.print(f"  {i}. {name}")
+            marker = " (suggested)" if name == suggested_ws else ""
+            console.print(f"  {i}. {name}{marker}")
+            if name == suggested_ws:
+                default_ws_idx = str(i)
         console.print("  s. Skip")
 
-        choice = click.prompt("Select workspace", default="1")
+        choice = click.prompt("Select workspace", default=default_ws_idx)
         if choice.lower() == "s":
             return False
 
@@ -473,21 +533,34 @@ def categorize_repo_interactive(config: Config, repo_name: str) -> bool:
 
     # Get existing categories
     existing_cats = sorted(workspace.categories.keys())
+
+    # Determine default choice for category
+    default_cat_choice = "n"
+    if suggested_cat and suggested_cat != ".":
+        # Check if suggested category exists or should be created
+        if suggested_cat in existing_cats:
+            default_cat_choice = str(existing_cats.index(suggested_cat) + 1)
+        else:
+            # Will create new category with suggested name
+            default_cat_choice = "n"
+
     if existing_cats:
         console.print("\nExisting categories:")
         for i, cat in enumerate(existing_cats, 1):
             display = cat if cat != "." else ". (root)"
-            console.print(f"  {i}. {display}")
+            marker = " (suggested)" if cat == suggested_cat else ""
+            console.print(f"  {i}. {display}{marker}")
 
     console.print("  n. New category")
     console.print("  s. Skip")
 
-    choice = click.prompt("Select category", default="n")
+    choice = click.prompt("Select category", default=default_cat_choice)
     if choice.lower() == "s":
         return False
 
     if choice.lower() == "n":
-        cat_path = click.prompt("Category path (e.g., 'vmware/vsphere' or '.')", default=".")
+        default_new_cat = suggested_cat if suggested_cat and suggested_cat != "." else "."
+        cat_path = click.prompt("Category path (e.g., 'vmware/vsphere' or '.')", default=default_new_cat)
     else:
         try:
             idx = int(choice) - 1

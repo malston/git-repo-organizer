@@ -604,3 +604,39 @@ class TestAdd:
         # Verify config was updated
         config = load_config(test_env["config"])
         assert "my-repo" in config.all_repos()
+
+    def test_adopts_repo_from_workspace(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Adopts a repo that exists in workspace but not in code."""
+        # Create repo directly in workspace (not a symlink)
+        (test_env["workspace"] / "direct-repo" / ".git").mkdir(parents=True)
+        (test_env["workspace"] / "direct-repo" / "README.md").write_text("test")
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "add",
+                "direct-repo",
+            ],
+            input="y\n",  # Confirm move
+        )
+        assert result.exit_code == 0
+
+        # Verify repo was moved to code directory
+        assert (test_env["code"] / "direct-repo" / ".git").exists()
+        assert (test_env["code"] / "direct-repo" / "README.md").exists()
+        # Original should be gone (or be a symlink after apply)
+        assert not (test_env["workspace"] / "direct-repo" / ".git").is_dir() or \
+               (test_env["workspace"] / "direct-repo").is_symlink()
+
+        # Verify config was updated
+        config = load_config(test_env["config"])
+        assert "direct-repo" in config.all_repos()
