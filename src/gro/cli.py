@@ -726,14 +726,41 @@ def _organize_repos_by_org(
 
         # Build category path
         cat_path = f"{domain}/{org}" if include_domain else org
-
-        # Create entry, with alias if local name differs from remote name
-        if repo_name != remote_repo_name:
-            entry = RepoEntry(repo_name=repo_name, alias=remote_repo_name)
-        else:
-            entry = RepoEntry(repo_name=repo_name)
-
         category = first_ws.get_or_create_category(cat_path)
+
+        # Get existing symlink names in this category
+        existing_names = category.symlink_names
+
+        # Determine the symlink name to use
+        if repo_name != remote_repo_name:
+            # Would like to use alias (remote repo name)
+            if remote_repo_name not in existing_names:
+                # Alias is available, use it
+                entry = RepoEntry(repo_name=repo_name, alias=remote_repo_name)
+            elif repo_name not in existing_names:
+                # Alias conflicts, fall back to local name
+                entry = RepoEntry(repo_name=repo_name)
+            else:
+                # Both alias and local name conflict - cannot place this repo
+                console.print(
+                    f"[yellow]Warning:[/yellow] Cannot place '{repo_name}' in "
+                    f"'{cat_path}' - symlink name conflicts with existing entry. "
+                    f"Edit config manually to resolve."
+                )
+                continue
+        else:
+            # Local name matches remote name, no alias needed
+            if repo_name not in existing_names:
+                entry = RepoEntry(repo_name=repo_name)
+            else:
+                # Local name conflicts - cannot place this repo
+                console.print(
+                    f"[yellow]Warning:[/yellow] Cannot place '{repo_name}' in "
+                    f"'{cat_path}' - symlink name conflicts with existing entry. "
+                    f"Edit config manually to resolve."
+                )
+                continue
+
         category.entries.append(entry)
 
     # Report results

@@ -353,6 +353,115 @@ class TestInit:
         assert entries[0].repo_name == "my-dotfiles"  # Local dir name
         assert entries[0].alias == "dotfiles"  # Remote repo name
 
+    def test_scan_by_org_skips_alias_on_conflict(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Skips alias when it would conflict with existing symlink name."""
+        import subprocess
+
+        # Create two repos that both have remote name "amplifier"
+        repo1 = test_env["code"] / "amplifier-claude"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        repo2 = test_env["code"] / "amplifier-preflight"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Should have both entries without conflict
+        assert "microsoft" in ws.categories
+        entries = ws.categories["microsoft"].entries
+        assert len(entries) == 2
+
+        # First one gets the alias, second uses local name
+        symlink_names = {e.symlink_name for e in entries}
+        assert "amplifier" in symlink_names  # One gets the alias
+        # The other should use its local name (no duplicate "amplifier")
+        assert len(symlink_names) == 2  # Two unique names
+
+    def test_scan_by_org_warns_on_unresolvable_conflict(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Warns when a repo cannot be placed due to unresolvable conflict."""
+        import subprocess
+
+        # Create repo "amplifier" (local name matches remote name)
+        repo1 = test_env["code"] / "amplifier"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        # Create another repo that also wants "amplifier" as symlink name
+        repo2 = test_env["code"] / "amplifier-fork"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        # Should have both - first gets alias, second uses local name
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+        entries = ws.categories["microsoft"].entries
+        symlink_names = {e.symlink_name for e in entries}
+
+        # amplifier (from repo1, no alias needed) and amplifier-fork (local name)
+        assert "amplifier" in symlink_names
+        assert "amplifier-fork" in symlink_names
+
 
 class TestStatus:
     """Tests for status command."""
