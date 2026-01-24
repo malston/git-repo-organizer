@@ -31,6 +31,7 @@ help:
 # Installation
 install:
 	uv sync --no-dev
+	uv tool install -e --force .
 
 dev:
 	uv sync

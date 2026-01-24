@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from gro.models import Category, Config, Workspace
 from gro.config import (
     ConfigError,
     create_default_config,
@@ -186,3 +187,23 @@ class TestValidateConfig:
         )
         warnings = validate_config(config)
         assert any("Workspace directory does not exist" in w for w in warnings)
+
+    def test_warns_on_category_repo_conflict(self, tmp_path: Path) -> None:
+        """Warns if category path conflicts with repo in parent category."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        ws_path = tmp_path / "workspace"
+        ws_path.mkdir()
+
+        config = Config(code_path=code_path)
+        ws = Workspace(path=ws_path)
+        # Add repo "wellsfargo-stuff" to root category
+        ws.categories["."] = Category(path=".", repos=["wellsfargo-stuff"])
+        # Add category "wellsfargo-stuff/git" which conflicts
+        ws.categories["wellsfargo-stuff/git"] = Category(
+            path="wellsfargo-stuff/git", repos=["config-lab"]
+        )
+        config.workspaces["workspace"] = ws
+
+        warnings = validate_config(config)
+        assert any("conflicts with repo" in w for w in warnings)

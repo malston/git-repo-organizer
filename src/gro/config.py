@@ -257,4 +257,38 @@ def validate_config(config: Config) -> list[str]:
                     f"{', '.join(locations)}"
                 )
 
+    # Check for category paths that conflict with repo names in parent categories
+    for ws_name, workspace in config.workspaces.items():
+        # Build map of category path -> repos in that category
+        category_repos: dict[str, set[str]] = {}
+        for cat_path, category in workspace.categories.items():
+            category_repos[cat_path] = set(category.repos)
+
+        # For each category, check if its path conflicts with a repo in a parent category
+        for cat_path in workspace.categories:
+            if cat_path == ".":
+                continue  # Root category can't conflict
+
+            # Split the path into parts
+            parts = cat_path.split("/")
+
+            # Check each prefix of the path
+            for i in range(len(parts)):
+                # The prefix path (parent category)
+                if i == 0:
+                    parent_path = "."
+                else:
+                    parent_path = "/".join(parts[:i])
+
+                # The component that would need to be a directory
+                component = parts[i]
+
+                # Check if parent category has a repo with this name
+                if parent_path in category_repos and component in category_repos[parent_path]:
+                    warnings.append(
+                        f"Category path '{cat_path}' in workspace '{ws_name}' "
+                        f"conflicts with repo '{component}' in category '{parent_path}'"
+                    )
+                    break  # Only report first conflict in path
+
     return warnings

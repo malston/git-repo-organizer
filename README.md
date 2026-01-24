@@ -14,7 +14,7 @@ gro helps you organize your git repositories by:
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/git-repo-organizer.git
+git clone https://github.com/malston/git-repo-organizer.git
 cd git-repo-organizer
 
 # Install with uv
