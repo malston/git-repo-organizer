@@ -1,5 +1,5 @@
 # ABOUTME: Command-line interface for the git repository organizer.
-# ABOUTME: Implements init, status, apply, sync, and add commands.
+# ABOUTME: Implements init, status, validate, apply, sync, add, and find commands.
 """CLI for gro - Git Repository Organizer."""
 
 from __future__ import annotations
@@ -668,6 +668,87 @@ def categorize_repo_interactive(
     else:
         console.print(f"  [yellow]Already in {ws_name}/{cat_path}[/yellow]")
         return False
+
+
+def get_repo_choices(config: Config) -> list[dict[str, str]]:
+    """
+    Build list of repo choices for fuzzy finder.
+
+    Args:
+        config: The configuration.
+
+    Returns:
+        List of dicts with 'name' (display) and 'value' (repo info).
+    """
+    choices: list[dict[str, str]] = []
+    for ws_name, workspace in config.workspaces.items():
+        for cat_path, category in workspace.categories.items():
+            for repo_name in category.repos:
+                display_path = format_symlink_path(ws_name, cat_path, repo_name)
+                full_path = str(workspace.path / cat_path / repo_name) if cat_path != "." else str(workspace.path / repo_name)
+                choices.append({
+                    "name": f"{repo_name} ({display_path})",
+                    "value": f"{repo_name}|{display_path}|{full_path}",
+                })
+    return sorted(choices, key=lambda x: x["name"])
+
+
+@main.command()
+@click.argument("pattern", required=False)
+@click.option(
+    "--list", "-l",
+    "list_mode",
+    is_flag=True,
+    help="List matching repos without interactive selection",
+)
+@pass_context
+def find(ctx: Context, pattern: str | None, list_mode: bool) -> None:
+    """Find a repository using fuzzy search.
+
+    Opens an interactive fuzzy finder to search through all configured repos.
+    Select a repo to see its full path.
+
+    Use --list to print matches without interactive selection.
+    """
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        raise SystemExit(1)
+
+    config = ctx.config
+    choices = get_repo_choices(config)
+
+    if not choices:
+        console.print("[yellow]No repos configured.[/yellow]")
+        return
+
+    if list_mode:
+        # Non-interactive: filter and print matches
+        for choice in choices:
+            repo_name = choice["value"].split("|")[0]
+            display_path = choice["value"].split("|")[1]
+            full_path = choice["value"].split("|")[2]
+            if pattern is None or pattern.lower() in repo_name.lower():
+                console.print(f"[bold]{repo_name}[/bold]")
+                console.print(f"  {display_path}")
+                console.print(f"  [dim]{full_path}[/dim]")
+        return
+
+    # Interactive fuzzy selection
+    from InquirerPy import inquirer
+
+    result = inquirer.fuzzy(
+        message="Find repo:",
+        choices=choices,
+        default=pattern or "",
+        match_exact=False,
+        border=True,
+    ).execute()
+
+    if result:
+        repo_name, display_path, full_path = result.split("|")
+        console.print(f"\n[bold]{repo_name}[/bold]")
+        console.print(f"  Location: {display_path}")
+        console.print(f"  Path: [green]{full_path}[/green]")
 
 
 if __name__ == "__main__":

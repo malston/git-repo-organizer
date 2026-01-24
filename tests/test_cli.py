@@ -885,3 +885,64 @@ class TestValidate:
         )
         assert result.exit_code == 1
         assert "directory exists" in result.output.lower()
+
+
+class TestFind:
+    """Tests for find command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_no_repos(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows message when no repos configured."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "No repos" in result.output
+
+    def test_list_mode_shows_matches(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """List mode shows matching repos without interactive prompt."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["tas-vcf", "tas-config", "other-repo"])
+        ws.categories["vmware"] = Category(path="vmware", repos=["tas-tools"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--list",
+                "tas",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "tas-vcf" in result.output
+        assert "tas-config" in result.output
+        assert "tas-tools" in result.output
+        assert "other-repo" not in result.output
