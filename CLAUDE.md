@@ -96,6 +96,9 @@ workspace/vendor/projects/
 ## CLI Commands
 
 - `gro init` - Initialize config file
+  - `--scan` - Scan repos and prompt for categorization
+  - `--by-org` - Organize by git remote org (auto-categorize)
+  - `--include-domain` - Include domain in category path
 - `gro status` - Show sync status (uncategorized repos, missing symlinks, conflicts)
 - `gro validate` - Check config for errors without making changes
 - `gro apply` - Create/update symlinks (blocks on errors, prompts on warnings)

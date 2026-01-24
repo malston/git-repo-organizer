@@ -171,6 +171,188 @@ class TestInit:
         assert result.exit_code == 0
         assert "Warning:" in result.output
 
+    def test_scan_by_org_organizes_repos(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Scan with --by-org organizes repos by git remote org."""
+        import subprocess
+
+        # Create repos with different orgs
+        repo1 = test_env["code"] / "homelab"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:malston/homelab.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        repo2 = test_env["code"] / "other-project"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:claudup/other-project.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Repos should be organized by org
+        assert "malston" in ws.categories
+        assert "claudup" in ws.categories
+        assert "homelab" in ws.categories["malston"].repo_names
+        assert "other-project" in ws.categories["claudup"].repo_names
+
+    def test_scan_by_org_with_domain(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Scan with --by-org --include-domain includes domain in category."""
+        import subprocess
+
+        # Create repos from different domains
+        repo1 = test_env["code"] / "public-repo"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:malston/public-repo.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        repo2 = test_env["code"] / "internal-repo"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.enterprise.com:malston/internal-repo.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+                "--include-domain",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Categories should include domain
+        assert "github.com/malston" in ws.categories
+        assert "github.enterprise.com/malston" in ws.categories
+        assert "public-repo" in ws.categories["github.com/malston"].repo_names
+        assert "internal-repo" in ws.categories["github.enterprise.com/malston"].repo_names
+
+    def test_scan_by_org_no_remote_goes_to_root(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Repos without remotes go to root category when using --by-org."""
+        import subprocess
+
+        # Create a repo without a remote
+        repo = test_env["code"] / "local-only"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Repo should be in root category
+        assert "." in ws.categories
+        assert "local-only" in ws.categories["."].repo_names
+
+    def test_scan_by_org_creates_alias_when_dir_differs(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Creates alias when local dir name differs from remote repo name."""
+        import subprocess
+
+        # Create repo with different local name than remote
+        repo = test_env["code"] / "my-dotfiles"  # Local name
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True)
+        subprocess.run(
+            # Remote name is "dotfiles"
+            ["git", "remote", "add", "origin", "git@github.com:malston/dotfiles.git"],
+            cwd=repo,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Should have entry with alias
+        assert "malston" in ws.categories
+        entries = ws.categories["malston"].entries
+        assert len(entries) == 1
+        assert entries[0].repo_name == "my-dotfiles"  # Local dir name
+        assert entries[0].alias == "dotfiles"  # Remote repo name
+
 
 class TestStatus:
     """Tests for status command."""

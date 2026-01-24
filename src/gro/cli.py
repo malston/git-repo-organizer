@@ -37,7 +37,9 @@ from gro.workspace import (
     cleanup_empty_directories,
     create_symlink,
     create_sync_plan,
+    get_repo_remotes,
     get_symlink_path,
+    parse_git_remote_url,
     scan_code_dir,
     scan_non_repos,
     scan_workspace_non_symlinks,
@@ -178,12 +180,24 @@ def main(
     is_flag=True,
     help="Scan existing repos and prompt for categorization",
 )
+@click.option(
+    "--by-org",
+    is_flag=True,
+    help="Organize repos by git remote org (requires --scan)",
+)
+@click.option(
+    "--include-domain",
+    is_flag=True,
+    help="Include domain in category path (requires --by-org)",
+)
 @pass_context
 def init(
     ctx: Context,
     code: Path | None,
     workspaces: tuple[Path, ...],
     scan: bool,
+    by_org: bool,
+    include_domain: bool,
 ) -> None:
     """Initialize gro configuration.
 
@@ -215,7 +229,12 @@ def init(
         if repos:
             console.print(f"\nFound {len(repos)} repositories in {config.code_path}")
 
-            if not ctx.non_interactive:
+            if by_org:
+                # Organize by git remote org
+                _organize_repos_by_org(
+                    config, repos, include_domain, ctx.non_interactive
+                )
+            elif not ctx.non_interactive:
                 for repo in repos:
                     categorize_repo_interactive(config, repo)
             else:
@@ -631,6 +650,96 @@ def add(ctx: Context, repo_name: str) -> None:
                 if create_symlink(symlink_path, target):
                     display = format_symlink_path(ws_name, cat_path, repo_name)
                     console.print(f"[green]Created symlink:[/green] {display}")
+
+
+def _organize_repos_by_org(
+    config: Config,
+    repos: list[str],
+    include_domain: bool,
+    non_interactive: bool,
+) -> None:
+    """
+    Organize repos by their git remote org.
+
+    Args:
+        config: The configuration to update.
+        repos: List of repo directory names.
+        include_domain: Whether to include domain in category path.
+        non_interactive: Whether to run without prompts.
+    """
+    if not config.workspaces:
+        return
+
+    first_ws = next(iter(config.workspaces.values()))
+
+    for repo_name in repos:
+        repo_path = config.code_path / repo_name
+        remotes = get_repo_remotes(repo_path)
+
+        if not remotes:
+            # No remotes, add to root category
+            category = first_ws.get_or_create_category(".")
+            category.entries.append(RepoEntry(repo_name=repo_name))
+            continue
+
+        # Get the remote URL to use
+        if "origin" in remotes:
+            remote_url = remotes["origin"]
+            remote_name = "origin"
+        elif len(remotes) == 1:
+            remote_name = next(iter(remotes.keys()))
+            remote_url = remotes[remote_name]
+        elif not non_interactive:
+            # Multiple remotes, ask user to choose
+            console.print(f"\n[bold]{repo_name}[/bold] has multiple remotes:")
+            remote_names = list(remotes.keys())
+            for i, name in enumerate(remote_names, 1):
+                console.print(f"  {i}. {name}: {remotes[name]}")
+
+            choice = click.prompt("Select remote", default="1")
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(remote_names):
+                    remote_name = remote_names[idx]
+                    remote_url = remotes[remote_name]
+                else:
+                    # Invalid choice, use first remote
+                    remote_name = remote_names[0]
+                    remote_url = remotes[remote_name]
+            except ValueError:
+                remote_name = remote_names[0]
+                remote_url = remotes[remote_name]
+        else:
+            # Non-interactive, use first remote
+            remote_name = next(iter(remotes.keys()))
+            remote_url = remotes[remote_name]
+
+        # Parse the remote URL
+        parsed = parse_git_remote_url(remote_url)
+        if not parsed:
+            # Couldn't parse, add to root category
+            category = first_ws.get_or_create_category(".")
+            category.entries.append(RepoEntry(repo_name=repo_name))
+            continue
+
+        domain, org, remote_repo_name = parsed
+
+        # Build category path
+        cat_path = f"{domain}/{org}" if include_domain else org
+
+        # Create entry, with alias if local name differs from remote name
+        if repo_name != remote_repo_name:
+            entry = RepoEntry(repo_name=repo_name, alias=remote_repo_name)
+        else:
+            entry = RepoEntry(repo_name=repo_name)
+
+        category = first_ws.get_or_create_category(cat_path)
+        category.entries.append(entry)
+
+    # Report results
+    total = len(repos)
+    categories = len(first_ws.categories)
+    console.print(f"Organized {total} repos into {categories} categories")
 
 
 def categorize_repo_interactive(

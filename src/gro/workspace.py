@@ -52,6 +52,90 @@ def scan_non_repos(code_path: Path) -> list[str]:
     return sorted(non_repos)
 
 
+def parse_git_remote_url(url: str) -> tuple[str, str, str] | None:
+    """
+    Parse a git remote URL to extract domain, org, and repo name.
+
+    Supports both SSH and HTTPS formats:
+    - git@github.com:malston/homelab.git
+    - https://github.com/malston/homelab.git
+
+    Args:
+        url: The git remote URL.
+
+    Returns:
+        Tuple of (domain, org, repo_name) or None if URL cannot be parsed.
+    """
+    import re
+
+    if not url:
+        return None
+
+    # Remove .git suffix if present
+    url = url.rstrip("/")
+    if url.endswith(".git"):
+        url = url[:-4]
+
+    # SSH format: git@domain:org/repo or git@domain:org/subgroup/repo
+    ssh_match = re.match(r"^git@([^:]+):(.+)/([^/]+)$", url)
+    if ssh_match:
+        domain = ssh_match.group(1)
+        org_path = ssh_match.group(2)
+        repo = ssh_match.group(3)
+        return (domain, org_path, repo)
+
+    # HTTPS format: https://domain/org/repo or https://domain/org/subgroup/repo
+    https_match = re.match(r"^https?://([^/]+)/(.+)/([^/]+)$", url)
+    if https_match:
+        domain = https_match.group(1)
+        org_path = https_match.group(2)
+        repo = https_match.group(3)
+        return (domain, org_path, repo)
+
+    return None
+
+
+def get_repo_remotes(repo_path: Path) -> dict[str, str]:
+    """
+    Get all remotes for a git repository.
+
+    Args:
+        repo_path: Path to the git repository.
+
+    Returns:
+        Dict mapping remote names to URLs.
+    """
+    import subprocess
+
+    if not (repo_path / ".git").exists():
+        return {}
+
+    try:
+        result = subprocess.run(
+            ["git", "remote", "-v"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return {}
+
+        remotes: dict[str, str] = {}
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            # Format: "origin\tgit@github.com:user/repo.git (fetch)"
+            parts = line.split()
+            if len(parts) >= 2 and "(fetch)" in line:
+                remote_name = parts[0]
+                remote_url = parts[1]
+                remotes[remote_name] = remote_url
+
+        return remotes
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return {}
+
+
 def scan_workspace_symlinks(workspace_path: Path) -> dict[str, list[str]]:
     """
     Scan a workspace directory for symlinks.

@@ -709,3 +709,161 @@ class TestAliasedSymlinks:
         assert (base / "git").resolve() == code_path / "acme-git"
         assert (base / "stuff").is_symlink()
         assert (base / "stuff").resolve() == code_path / "acme-stuff"
+
+
+class TestParseGitRemoteUrl:
+    """Tests for parse_git_remote_url function."""
+
+    def test_ssh_github_url(self) -> None:
+        """Parses SSH GitHub URL."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("git@github.com:malston/homelab.git")
+        assert result == ("github.com", "malston", "homelab")
+
+    def test_ssh_github_url_no_git_suffix(self) -> None:
+        """Parses SSH GitHub URL without .git suffix."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("git@github.com:malston/homelab")
+        assert result == ("github.com", "malston", "homelab")
+
+    def test_https_github_url(self) -> None:
+        """Parses HTTPS GitHub URL."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("https://github.com/malston/homelab.git")
+        assert result == ("github.com", "malston", "homelab")
+
+    def test_https_github_url_no_git_suffix(self) -> None:
+        """Parses HTTPS GitHub URL without .git suffix."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("https://github.com/malston/homelab")
+        assert result == ("github.com", "malston", "homelab")
+
+    def test_ssh_enterprise_github_url(self) -> None:
+        """Parses SSH Enterprise GitHub URL."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("git@github.enterprise.com:markalston/gro.git")
+        assert result == ("github.enterprise.com", "markalston", "gro")
+
+    def test_https_enterprise_github_url(self) -> None:
+        """Parses HTTPS Enterprise GitHub URL."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("https://github.enterprise.com/markalston/gro.git")
+        assert result == ("github.enterprise.com", "markalston", "gro")
+
+    def test_ssh_gitlab_url(self) -> None:
+        """Parses SSH GitLab URL."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("git@gitlab.com:myorg/myrepo.git")
+        assert result == ("gitlab.com", "myorg", "myrepo")
+
+    def test_https_gitlab_url(self) -> None:
+        """Parses HTTPS GitLab URL."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("https://gitlab.com/myorg/myrepo.git")
+        assert result == ("gitlab.com", "myorg", "myrepo")
+
+    def test_invalid_url_returns_none(self) -> None:
+        """Returns None for invalid URL."""
+        from gro.workspace import parse_git_remote_url
+
+        assert parse_git_remote_url("not-a-url") is None
+        assert parse_git_remote_url("") is None
+
+    def test_nested_gitlab_groups(self) -> None:
+        """Parses GitLab URL with nested groups."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("git@gitlab.com:org/subgroup/repo.git")
+        assert result == ("gitlab.com", "org/subgroup", "repo")
+
+    def test_https_nested_groups(self) -> None:
+        """Parses HTTPS URL with nested groups."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("https://gitlab.com/org/subgroup/deep/repo.git")
+        assert result == ("gitlab.com", "org/subgroup/deep", "repo")
+
+
+class TestGetRepoRemotes:
+    """Tests for get_repo_remotes function."""
+
+    def test_repo_with_origin(self, tmp_path: Path) -> None:
+        """Returns origin remote for repo with origin."""
+        from gro.workspace import get_repo_remotes
+
+        # Create a git repo with origin
+        repo_path = tmp_path / "my-repo"
+        repo_path.mkdir()
+        (repo_path / ".git").mkdir()
+
+        # Initialize git and add remote
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=repo_path, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:malston/my-repo.git"],
+            cwd=repo_path,
+            capture_output=True,
+        )
+
+        remotes = get_repo_remotes(repo_path)
+        assert "origin" in remotes
+        assert remotes["origin"] == "git@github.com:malston/my-repo.git"
+
+    def test_repo_with_multiple_remotes(self, tmp_path: Path) -> None:
+        """Returns all remotes for repo with multiple remotes."""
+        from gro.workspace import get_repo_remotes
+
+        repo_path = tmp_path / "my-repo"
+        repo_path.mkdir()
+
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=repo_path, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:malston/my-repo.git"],
+            cwd=repo_path,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "upstream", "git@github.com:original/my-repo.git"],
+            cwd=repo_path,
+            capture_output=True,
+        )
+
+        remotes = get_repo_remotes(repo_path)
+        assert len(remotes) == 2
+        assert remotes["origin"] == "git@github.com:malston/my-repo.git"
+        assert remotes["upstream"] == "git@github.com:original/my-repo.git"
+
+    def test_repo_without_remotes(self, tmp_path: Path) -> None:
+        """Returns empty dict for repo without remotes."""
+        from gro.workspace import get_repo_remotes
+
+        repo_path = tmp_path / "local-repo"
+        repo_path.mkdir()
+
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=repo_path, capture_output=True)
+
+        remotes = get_repo_remotes(repo_path)
+        assert remotes == {}
+
+    def test_non_git_directory(self, tmp_path: Path) -> None:
+        """Returns empty dict for non-git directory."""
+        from gro.workspace import get_repo_remotes
+
+        non_git = tmp_path / "not-a-repo"
+        non_git.mkdir()
+
+        remotes = get_repo_remotes(non_git)
+        assert remotes == {}
