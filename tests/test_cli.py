@@ -491,15 +491,15 @@ class TestInit:
         symlink = test_env["workspace"] / "my-repo"
         assert symlink.is_symlink()
 
-    def test_auto_apply_skips_on_warnings(
+    def test_auto_apply_creates_workspace_dir(
         self, runner: CliRunner, test_env: dict[str, Path]
     ) -> None:
-        """--auto-apply skips apply when there are warnings."""
+        """--auto-apply creates workspace directory if it doesn't exist."""
         # Create a repo
         (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
 
-        # Use non-existent workspace (generates warning)
-        nonexistent_ws = test_env["workspace"].parent / "nonexistent"
+        # Use non-existent workspace
+        nonexistent_ws = test_env["workspace"].parent / "new-workspace"
 
         result = runner.invoke(
             main,
@@ -517,10 +517,11 @@ class TestInit:
             ],
         )
         assert result.exit_code == 0
-        assert "Warning:" in result.output
-        assert "Skipping auto-apply" in result.output
-        # Should NOT contain "Created" since apply was skipped
-        assert "Created" not in result.output
+        # Workspace should be created
+        assert nonexistent_ws.exists()
+        # Symlink should be created
+        assert (nonexistent_ws / "my-repo").is_symlink()
+        assert "Created 1 symlinks" in result.output
 
     def test_auto_apply_skips_on_conflicts(
         self, runner: CliRunner, test_env: dict[str, Path]
@@ -1021,14 +1022,13 @@ class TestApply:
         self, runner: CliRunner, test_env: dict[str, Path]
     ) -> None:
         """Proceeds when user confirms despite warnings."""
-        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
-        # Use non-existent workspace to trigger warning
-        nonexistent_ws = test_env["workspace"].parent / "nonexistent-ws"
+        # Use non-existent code directory to trigger warning
+        nonexistent_code = test_env["code"].parent / "nonexistent-code"
 
-        config = Config(code_path=test_env["code"])
-        ws = Workspace(path=nonexistent_ws)
+        config = Config(code_path=nonexistent_code)
+        ws = Workspace(path=test_env["workspace"])
         ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
-        config.workspaces["nonexistent-ws"] = ws
+        config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
         # User confirms to continue
@@ -1087,6 +1087,61 @@ class TestApply:
         )
         assert "Warning" in result.output
         assert "Continue?" not in result.output
+
+    def test_prompts_to_create_workspace_dir(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Prompts user to create workspace directory if it doesn't exist."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+        nonexistent_ws = test_env["workspace"].parent / "new-workspace"
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=nonexistent_ws)
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        config.workspaces["new-workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # User confirms to create directory
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+            input="y\n",
+        )
+        assert result.exit_code == 0
+        assert "Create it?" in result.output
+        assert nonexistent_ws.exists()
+        assert (nonexistent_ws / "my-repo").is_symlink()
+
+    def test_skips_apply_if_user_declines_workspace_creation(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Skips apply if user declines to create workspace directory."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+        nonexistent_ws = test_env["workspace"].parent / "new-workspace"
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=nonexistent_ws)
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        config.workspaces["new-workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # User declines to create directory
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+            input="n\n",
+        )
+        assert result.exit_code == 0
+        assert "Create it?" in result.output
+        assert not nonexistent_ws.exists()
 
 
 class TestSync:

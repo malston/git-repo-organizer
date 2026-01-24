@@ -265,6 +265,18 @@ def init(
 
     # Auto-apply if requested
     if auto_apply:
+        # Create workspace directories if they don't exist
+        for workspace in config.workspaces.values():
+            if not workspace.path.exists():
+                if ctx.dry_run:
+                    console.print(f"[blue]Would create:[/blue] {workspace.path}")
+                else:
+                    workspace.path.mkdir(parents=True, exist_ok=True)
+                    console.print(f"[green]Created:[/green] {workspace.path}")
+
+        # Re-validate after creating directories
+        warnings = validate_config(config)
+
         # Check for blocking errors
         blocking_errors = [w for w in warnings if "conflicts with repo" in w]
 
@@ -461,10 +473,33 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
 
     config = ctx.config
 
+    # Check for missing workspace directories and prompt to create them
+    for workspace in config.workspaces.values():
+        if not workspace.path.exists():
+            if ctx.dry_run:
+                console.print(f"[blue]Would create:[/blue] {workspace.path}")
+            elif ctx.non_interactive:
+                workspace.path.mkdir(parents=True, exist_ok=True)
+                console.print(f"[green]Created:[/green] {workspace.path}")
+            else:
+                console.print(
+                    f"[yellow]Workspace directory does not exist:[/yellow] {workspace.path}"
+                )
+                if click.confirm("Create it?", default=True):
+                    workspace.path.mkdir(parents=True, exist_ok=True)
+                    console.print(f"[green]Created:[/green] {workspace.path}")
+                else:
+                    console.print("[yellow]Aborted[/yellow]")
+                    return
+
     # Check for config errors that would cause broken symlinks
     all_warnings = validate_config(config)
     blocking_errors = [w for w in all_warnings if "conflicts with repo" in w]
-    non_blocking_warnings = [w for w in all_warnings if "conflicts with repo" not in w]
+    # Filter out workspace "does not exist" warnings since we handled those above
+    non_blocking_warnings = [
+        w for w in all_warnings
+        if "conflicts with repo" not in w and "Workspace directory does not exist" not in w
+    ]
 
     if blocking_errors:
         console.print("[red]Cannot apply - config has errors:[/red]")
