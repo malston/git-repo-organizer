@@ -548,6 +548,80 @@ class TestApply:
         assert "Cannot apply" in result.output
         assert "directory exists" in result.output.lower()
 
+    def test_prompts_on_warnings(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Prompts user to continue when config has warnings."""
+        # Create repo but use non-existent code path to trigger warning
+        nonexistent_code = test_env["code"].parent / "nonexistent"
+
+        config = Config(code_path=nonexistent_code)
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        # User declines to continue
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+            input="n\n",
+        )
+        assert result.exit_code == 0
+        assert "Warning" in result.output
+        assert "Continue?" in result.output
+
+    def test_proceeds_on_warnings_when_confirmed(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Proceeds when user confirms despite warnings."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+        # Use non-existent workspace to trigger warning
+        nonexistent_ws = test_env["workspace"].parent / "nonexistent-ws"
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=nonexistent_ws)
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["nonexistent-ws"] = ws
+        save_config(config, test_env["config"])
+
+        # User confirms to continue
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+            input="y\n",
+        )
+        assert "Warning" in result.output
+        assert "Continue?" in result.output
+
+    def test_skips_prompt_in_non_interactive(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Skips warning prompt in non-interactive mode."""
+        nonexistent_code = test_env["code"].parent / "nonexistent"
+
+        config = Config(code_path=nonexistent_code)
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "apply",
+            ],
+        )
+        assert "Warning" in result.output
+        assert "Continue?" not in result.output
+
 
 class TestSync:
     """Tests for sync command."""

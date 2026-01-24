@@ -347,14 +347,26 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
     config = ctx.config
 
     # Check for config errors that would cause broken symlinks
-    warnings = validate_config(config)
-    blocking_warnings = [w for w in warnings if "conflicts with repo" in w]
-    if blocking_warnings:
+    all_warnings = validate_config(config)
+    blocking_errors = [w for w in all_warnings if "conflicts with repo" in w]
+    non_blocking_warnings = [w for w in all_warnings if "conflicts with repo" not in w]
+
+    if blocking_errors:
         console.print("[red]Cannot apply - config has errors:[/red]")
-        for warning in blocking_warnings:
+        for warning in blocking_errors:
             console.print(f"  [red]![/red] {warning}")
         console.print("\n[yellow]Fix the config before applying.[/yellow]")
         raise SystemExit(1)
+
+    # Show non-blocking warnings and prompt to continue
+    if non_blocking_warnings:
+        console.print("[yellow]Warnings:[/yellow]")
+        for warning in non_blocking_warnings:
+            console.print(f"  [yellow]![/yellow] {warning}")
+        if not ctx.non_interactive:
+            if not click.confirm("\nContinue?", default=False):
+                return
+        console.print()
 
     plan = create_sync_plan(config)
 
