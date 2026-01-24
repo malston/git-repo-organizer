@@ -173,6 +173,28 @@ gro find --path vcf   # Output only path (useful for cd)
 cd "$(gro find --path)"
 ```
 
+**Shell function for quick navigation:**
+
+Add this to your `~/.bashrc` or `~/.zshrc` to create a `gcd` command that jumps to repositories:
+
+```bash
+# Jump to a git repo managed by gro
+gcd() {
+  local dir
+  dir=$(gro find --path "$@")
+  if [[ -n "$dir" ]]; then
+    cd "$dir"
+  fi
+}
+```
+
+Then use it like:
+
+```bash
+gcd             # Interactive selection, then cd to chosen repo
+gcd vcf         # Filter by pattern, then cd to chosen repo
+```
+
 ### `gro fmt`
 
 Format the configuration file, sorting categories and repos alphabetically.
