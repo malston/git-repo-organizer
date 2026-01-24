@@ -304,6 +304,14 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
 
     plan = create_sync_plan(config)
 
+    # Check for symlink conflicts (directory exists where symlink should be)
+    if plan.symlink_conflicts:
+        console.print("[red]Cannot apply - directory exists where symlink should be:[/red]")
+        for ws_name, cat_path, repo_name in plan.symlink_conflicts:
+            console.print(f"  [red]![/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        console.print("\n[yellow]Remove or move the directories before applying.[/yellow]")
+        raise SystemExit(1)
+
     if not plan.has_changes:
         console.print("[green]Nothing to do - everything is in sync![/green]")
         return

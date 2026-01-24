@@ -521,6 +521,33 @@ class TestApply:
         assert "Cannot apply" in result.output
         assert "config has errors" in result.output
 
+    def test_refuses_with_symlink_conflicts(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Refuses to apply when directory exists where symlink should be."""
+        # Create repo in code directory
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+        # Create non-symlink directory in workspace where symlink should go
+        (test_env["workspace"] / "my-repo").mkdir()
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Cannot apply" in result.output
+        assert "directory exists" in result.output.lower()
+
 
 class TestSync:
     """Tests for sync command."""
