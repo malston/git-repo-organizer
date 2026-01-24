@@ -17,10 +17,10 @@ gro helps you organize your git repositories by:
 git clone https://github.com/malston/git-repo-organizer.git
 cd git-repo-organizer
 
-# Install with uv
-uv sync
+# Install globally
+make install
 
-# Or install globally
+# Or with uv directly
 uv tool install .
 ```
 
@@ -70,7 +70,7 @@ Use `repo_name:alias` syntax to create symlinks with different names:
 ```yaml
 workspace:
   acme/tools:
-    - acme-builder # Creates symlink "govc"
+    - acme-builder # Creates symlink "acme-builder"
     - acme-code:code # Creates symlink "code" -> acme-code repo
     - acme-stuff:stuff # Creates symlink "stuff" -> acme-stuff repo
 ```
@@ -79,8 +79,8 @@ This creates:
 
 ```
 workspace/acme/tools/
-├── govc -> ../../../code/acme-builder
-├── git -> ../../../code/acme-code
+├── acme-builder -> ../../../code/acme-builder
+├── code -> ../../../code/acme-code
 └── stuff -> ../../../code/acme-stuff
 ```
 
@@ -93,9 +93,10 @@ Initialize configuration with code and workspace directories.
 ```bash
 gro init --code ~/code --workspace ~/workspace
 gro init --scan                    # Scan and categorize existing repos interactively
-gro --non-interactive init --scan --by-org  # Auto-organize by git remote org
-gro --non-interactive init --scan --by-org --include-domain  # Include domain in path
-gro --non-interactive init --scan --auto-apply  # Auto-apply symlinks after init
+gro init --scan --by-org           # Auto-organize by git remote org
+gro init --scan --by-org --include-domain  # Include domain in category path
+gro init --scan --auto-apply       # Auto-apply symlinks after init
+gro init --overwrite               # Overwrite existing config and clean workspace symlinks
 ```
 
 The `--by-org` flag parses each repo's git remote to extract the org/owner and creates categories automatically. Use `--include-domain` for multi-host setups (e.g., GitHub + GitHub Enterprise).
@@ -129,9 +130,10 @@ gro status
 Create/update symlinks based on configuration.
 
 ```bash
-gro apply           # Create missing symlinks
-gro apply --prune   # Also remove orphaned symlinks
-gro -n apply        # Dry run - preview changes
+gro apply              # Create missing symlinks
+gro apply --prune      # Also remove orphaned symlinks
+gro apply -w workspace # Only apply to specific workspace
+gro -n apply           # Dry run - preview changes
 ```
 
 ### `gro sync`
@@ -140,6 +142,7 @@ Add uncategorized repos from code directory to config.
 
 ```bash
 gro sync                    # Interactive categorization
+gro sync -w workspace       # Only sync specific workspace
 gro --non-interactive sync  # Add all to root category
 ```
 
@@ -216,9 +219,13 @@ gro cat add -w projects tools # Add category to specific workspace
 
 ## Common Options
 
-- `--config/-c PATH` - Use custom config file
+- `--config/-c PATH` - Use custom config file (or set `GRO_CONFIG` env var)
 - `--dry-run/-n` - Preview changes without making them
 - `--non-interactive` - Use defaults without prompts
+
+Environment variables:
+
+- `GRO_CONFIG` - Path to config file (alternative to `--config`)
 
 ## Development
 
@@ -234,6 +241,9 @@ make check
 
 # Format code
 make format
+
+# Install globally (for testing outside project directory)
+make install
 ```
 
 ## License
