@@ -885,3 +885,179 @@ class TestValidate:
         )
         assert result.exit_code == 1
         assert "directory exists" in result.output.lower()
+
+
+class TestFind:
+    """Tests for find command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_no_repos(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows message when no repos configured."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "No repos" in result.output
+
+    def test_list_mode_shows_matches(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """List mode shows matching repos without interactive prompt."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["tas-vcf", "tas-config", "other-repo"])
+        ws.categories["vmware"] = Category(path="vmware", repos=["tas-tools"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--list",
+                "tas",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "tas-vcf" in result.output
+        assert "tas-config" in result.output
+        assert "tas-tools" in result.output
+        assert "other-repo" not in result.output
+
+    def test_path_mode_outputs_path_only(
+        self, runner: CliRunner, test_env: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Path mode outputs only the selected path for cd."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # Mock the fuzzy selector to return a selection
+        def mock_fuzzy(*args, **kwargs):
+            class MockPrompt:
+                def execute(self):
+                    return f"my-repo|workspace/my-repo|{test_env['workspace']}/my-repo"
+            return MockPrompt()
+
+        monkeypatch.setattr("gro.cli.inquirer.fuzzy", mock_fuzzy)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--path",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should output only the path, no extra formatting
+        assert result.output.strip() == str(test_env["workspace"] / "my-repo")
+
+    def test_list_mode_without_pattern_shows_all(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """List mode without pattern shows all repos."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["repo-a", "repo-b"])
+        ws.categories["nested"] = Category(path="nested", repos=["repo-c"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--list",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "repo-a" in result.output
+        assert "repo-b" in result.output
+        assert "repo-c" in result.output
+
+    def test_nested_category_paths_correct(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Nested category paths are displayed and resolved correctly."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["vmware/cloud-foundry"] = Category(
+            path="vmware/cloud-foundry", repos=["tas-vcf"]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--list",
+                "tas",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "tas-vcf" in result.output
+        assert "workspace/vmware/cloud-foundry/tas-vcf" in result.output
+        # Full path should include the nested structure (check parts due to line wrapping)
+        assert "vmware/cloud-foundry/tas-vcf" in result.output
+
+    def test_cancelled_selection_in_path_mode(
+        self, runner: CliRunner, test_env: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Cancelled selection in path mode exits with code 1."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # Mock the fuzzy selector to return None (cancelled)
+        def mock_fuzzy(*args, **kwargs):
+            class MockPrompt:
+                def execute(self):
+                    return None
+            return MockPrompt()
+
+        monkeypatch.setattr("gro.cli.inquirer.fuzzy", mock_fuzzy)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--path",
+            ],
+        )
+        assert result.exit_code == 1

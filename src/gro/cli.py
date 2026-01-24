@@ -1,14 +1,25 @@
 # ABOUTME: Command-line interface for the git repository organizer.
-# ABOUTME: Implements init, status, apply, sync, and add commands.
+# ABOUTME: Implements init, status, validate, apply, sync, add, and find commands.
 """CLI for gro - Git Repository Organizer."""
 
 from __future__ import annotations
 
-import shutil
+import sys
+from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING, Generator
+import shutil
 
 import click
+from InquirerPy import inquirer
+from prompt_toolkit.application import create_app_session
+from prompt_toolkit.input import create_input
+from prompt_toolkit.output import create_output
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from prompt_toolkit.input import Input
+    from prompt_toolkit.output import Output
 
 from gro.config import (
     create_default_config,
@@ -27,6 +38,21 @@ from gro.workspace import (
 )
 
 console = Console()
+
+
+@contextmanager
+def _stderr_output() -> Generator[None, None, None]:
+    """Redirect prompt_toolkit output to stderr for --path mode."""
+    inp = create_input()
+    out = create_output(stdout=sys.stderr)
+    with create_app_session(input=inp, output=out):
+        yield
+
+
+@contextmanager
+def _noop_context() -> Generator[None, None, None]:
+    """No-op context manager for when no redirection is needed."""
+    yield
 
 
 def format_symlink_path(ws_name: str, cat_path: str, repo_name: str) -> str:
@@ -668,6 +694,110 @@ def categorize_repo_interactive(
     else:
         console.print(f"  [yellow]Already in {ws_name}/{cat_path}[/yellow]")
         return False
+
+
+def get_repo_choices(config: Config) -> list[dict[str, str]]:
+    """
+    Build list of repo choices for fuzzy finder.
+
+    Args:
+        config: The configuration.
+
+    Returns:
+        List of dicts with 'name' (display) and 'value' (repo info).
+    """
+    choices: list[dict[str, str]] = []
+    for ws_name, workspace in config.workspaces.items():
+        for cat_path, category in workspace.categories.items():
+            for repo_name in category.repos:
+                display_path = format_symlink_path(ws_name, cat_path, repo_name)
+                full_path = str(workspace.path / cat_path / repo_name) if cat_path != "." else str(workspace.path / repo_name)
+                choices.append({
+                    "name": f"{repo_name} ({display_path})",
+                    "value": f"{repo_name}|{display_path}|{full_path}",
+                })
+    return sorted(choices, key=lambda x: x["name"])
+
+
+@main.command()
+@click.argument("pattern", required=False)
+@click.option(
+    "--list", "-l",
+    "list_mode",
+    is_flag=True,
+    help="List matching repos without interactive selection",
+)
+@click.option(
+    "--path", "-p",
+    "path_mode",
+    is_flag=True,
+    help="Output only the path (for use with cd)",
+)
+@pass_context
+def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) -> None:
+    """Find a repository using fuzzy search.
+
+    Opens an interactive fuzzy finder to search through all configured repos.
+    Select a repo to see its full path.
+
+    Use --list to print matches without interactive selection.
+    Use --path to output only the path (for cd integration).
+    """
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        raise SystemExit(1)
+
+    config = ctx.config
+    choices = get_repo_choices(config)
+
+    if not choices:
+        console.print("[yellow]No repos configured.[/yellow]")
+        return
+
+    if list_mode:
+        # Non-interactive: filter and print matches
+        for choice in choices:
+            repo_name = choice["value"].split("|")[0]
+            display_path = choice["value"].split("|")[1]
+            full_path = choice["value"].split("|")[2]
+            if pattern is None or pattern.lower() in repo_name.lower():
+                console.print(f"[bold]{repo_name}[/bold]")
+                console.print(f"  {display_path}")
+                console.print(f"  [dim]{full_path}[/dim]")
+        return
+
+    # Interactive fuzzy selection
+    # For --path mode, render TUI to stderr so stdout is clean for cd
+    try:
+        ctx_manager = _stderr_output() if path_mode else _noop_context()
+        with ctx_manager:
+            result = inquirer.fuzzy(
+                message="Find repo:",
+                choices=choices,
+                default=pattern or "",
+                match_exact=False,
+                border=True,
+            ).execute()
+    except KeyboardInterrupt:
+        # User cancelled with Ctrl+C
+        if path_mode:
+            raise SystemExit(1)
+        return
+
+    if not result:
+        # User cancelled or no selection
+        if path_mode:
+            raise SystemExit(1)
+        return
+
+    repo_name, display_path, full_path = result.split("|")
+    if path_mode:
+        # Output only the path for command substitution
+        click.echo(full_path)
+    else:
+        console.print(f"\n[bold]{repo_name}[/bold]")
+        console.print(f"  Location: {display_path}")
+        console.print(f"  Path: [green]{full_path}[/green]")
 
 
 if __name__ == "__main__":
