@@ -4,13 +4,16 @@
 
 from __future__ import annotations
 
+import io
+import shutil
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Generator
-import shutil
+from typing import TYPE_CHECKING
 
 import click
+import yaml
 from InquirerPy import inquirer
 from prompt_toolkit.application import create_app_session
 from prompt_toolkit.input import create_input
@@ -18,22 +21,25 @@ from prompt_toolkit.output import create_output
 from rich.console import Console
 
 if TYPE_CHECKING:
-    from prompt_toolkit.input import Input
-    from prompt_toolkit.output import Output
+    pass
 
 from gro.config import (
     create_default_config,
     get_default_config_path,
     load_config,
     save_config,
+    serialize_config,
     validate_config,
 )
-from gro.models import Config
+from gro.models import Config, RepoEntry
 from gro.workspace import (
     apply_sync_plan,
     cleanup_empty_directories,
+    create_symlink,
     create_sync_plan,
+    get_symlink_path,
     scan_code_dir,
+    scan_non_repos,
     scan_workspace_non_symlinks,
 )
 
@@ -217,7 +223,7 @@ def init(
                 if config.workspaces:
                     first_ws = next(iter(config.workspaces.values()))
                     category = first_ws.get_or_create_category(".")
-                    category.repos.extend(repos)
+                    category.entries.extend([RepoEntry(repo_name=r) for r in repos])
                     console.print(f"Added {len(repos)} repos to '{first_ws.name}' workspace")
 
     # Save config
@@ -260,32 +266,49 @@ def status(ctx: Context) -> None:
     # Show symlinks to create
     if plan.symlinks_to_create:
         console.print("\n[bold]Symlinks to create:[/bold]")
-        for ws_name, cat_path, repo_name in plan.symlinks_to_create:
-            console.print(f"  [green]+[/green] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_create:
+            display = format_symlink_path(ws_name, cat_path, symlink_name)
+            if symlink_name != repo_name:
+                display += f" -> {repo_name}"
+            console.print(f"  [green]+[/green] {display}")
 
     # Show symlinks to update
     if plan.symlinks_to_update:
         console.print("\n[bold]Symlinks to update:[/bold]")
-        for ws_name, cat_path, repo_name in plan.symlinks_to_update:
-            console.print(f"  [blue]~[/blue] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_update:
+            display = format_symlink_path(ws_name, cat_path, symlink_name)
+            if symlink_name != repo_name:
+                display += f" -> {repo_name}"
+            console.print(f"  [blue]~[/blue] {display}")
 
     # Show orphaned symlinks
     if plan.symlinks_to_remove:
         console.print("\n[bold]Orphaned symlinks (not in config):[/bold]")
-        for ws_name, cat_path, repo_name in plan.symlinks_to_remove:
-            console.print(f"  [red]-[/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, symlink_name in plan.symlinks_to_remove:
+            console.print(f"  [red]-[/red] {format_symlink_path(ws_name, cat_path, symlink_name)}")
 
     # Show symlink conflicts (directory exists where symlink should be)
     if plan.symlink_conflicts:
         console.print("\n[bold]Conflicts (directory exists where symlink should be):[/bold]")
-        for ws_name, cat_path, repo_name in plan.symlink_conflicts:
-            console.print(f"  [red]![/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, repo_name, symlink_name in plan.symlink_conflicts:
+            display = format_symlink_path(ws_name, cat_path, symlink_name)
+            if symlink_name != repo_name:
+                display += f" -> {repo_name}"
+            console.print(f"  [red]![/red] {display}")
 
     # Show non-symlink directories
     if plan.non_symlink_dirs:
         console.print("\n[bold]Non-symlink directories in workspace:[/bold]")
         for ws_name, cat_path, dir_name in plan.non_symlink_dirs:
-            console.print(f"  [yellow]?[/yellow] {format_symlink_path(ws_name, cat_path, dir_name)}")
+            path = format_symlink_path(ws_name, cat_path, dir_name)
+            console.print(f"  [yellow]?[/yellow] {path}")
+
+    # Show non-repo directories in code folder
+    non_repos = scan_non_repos(config.code_path)
+    if non_repos:
+        console.print("\n[bold]Non-repo directories in code folder:[/bold]")
+        for dir_name in non_repos:
+            console.print(f"  [yellow]?[/yellow] {dir_name}")
 
     # Summary
     if not plan.has_changes and not plan.has_warnings:
@@ -325,10 +348,10 @@ def validate(ctx: Context) -> None:
 
     # Check for symlink conflicts
     plan = create_sync_plan(config)
-    for ws_name, cat_path, repo_name in plan.symlink_conflicts:
+    for ws_name, cat_path, _repo_name, symlink_name in plan.symlink_conflicts:
         errors.append(
             f"Directory exists where symlink should be: "
-            f"{format_symlink_path(ws_name, cat_path, repo_name)}"
+            f"{format_symlink_path(ws_name, cat_path, symlink_name)}"
         )
 
     # Report results
@@ -389,9 +412,8 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
         console.print("[yellow]Warnings:[/yellow]")
         for warning in non_blocking_warnings:
             console.print(f"  [yellow]![/yellow] {warning}")
-        if not ctx.non_interactive:
-            if not click.confirm("\nContinue?", default=False):
-                return
+        if not ctx.non_interactive and not click.confirm("\nContinue?", default=False):
+            return
         console.print()
 
     plan = create_sync_plan(config)
@@ -399,8 +421,9 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
     # Check for symlink conflicts (directory exists where symlink should be)
     if plan.symlink_conflicts:
         console.print("[red]Cannot apply - directory exists where symlink should be:[/red]")
-        for ws_name, cat_path, repo_name in plan.symlink_conflicts:
-            console.print(f"  [red]![/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, _repo_name, symlink_name in plan.symlink_conflicts:
+            path = format_symlink_path(ws_name, cat_path, symlink_name)
+            console.print(f"  [red]![/red] {path}")
         console.print("\n[yellow]Remove or move the directories before applying.[/yellow]")
         raise SystemExit(1)
 
@@ -423,18 +446,24 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
     # Show what will be done
     if plan.symlinks_to_create:
         console.print("\n[bold]Creating symlinks:[/bold]")
-        for ws_name, cat_path, repo_name in plan.symlinks_to_create:
-            console.print(f"  [green]+[/green] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_create:
+            display = format_symlink_path(ws_name, cat_path, symlink_name)
+            if symlink_name != repo_name:
+                display += f" -> {repo_name}"
+            console.print(f"  [green]+[/green] {display}")
 
     if plan.symlinks_to_update:
         console.print("\n[bold]Updating symlinks:[/bold]")
-        for ws_name, cat_path, repo_name in plan.symlinks_to_update:
-            console.print(f"  [blue]~[/blue] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_update:
+            display = format_symlink_path(ws_name, cat_path, symlink_name)
+            if symlink_name != repo_name:
+                display += f" -> {repo_name}"
+            console.print(f"  [blue]~[/blue] {display}")
 
     if prune and plan.symlinks_to_remove:
         console.print("\n[bold]Removing orphaned symlinks:[/bold]")
-        for ws_name, cat_path, repo_name in plan.symlinks_to_remove:
-            console.print(f"  [red]-[/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
+        for ws_name, cat_path, symlink_name in plan.symlinks_to_remove:
+            console.print(f"  [red]-[/red] {format_symlink_path(ws_name, cat_path, symlink_name)}")
 
     if ctx.dry_run:
         console.print("\n[blue]Dry run - no changes made[/blue]")
@@ -504,7 +533,7 @@ def sync(ctx: Context, workspace_name: str | None) -> None:
                 workspace = config.workspaces.get(ws_name)
                 if workspace:
                     category = workspace.get_or_create_category(".")
-                    category.repos.append(repo)
+                    category.entries.append(RepoEntry(repo_name=repo))
                     console.print(f"  [green]+[/green] {repo} -> {ws_name}/.")
                     added_count += 1
         else:
@@ -580,8 +609,9 @@ def add(ctx: Context, repo_name: str) -> None:
             workspace = config.workspaces[ws_name]
             cat_path = suggested_cat or "."
             category = workspace.get_or_create_category(cat_path)
-            category.repos.append(repo_name)
-            console.print(f"Added {repo_name} to {format_symlink_path(ws_name, cat_path, repo_name)}")
+            category.entries.append(RepoEntry(repo_name=repo_name))
+            path = format_symlink_path(ws_name, cat_path, repo_name)
+            console.print(f"Added {repo_name} to {path}")
     else:
         categorize_repo_interactive(config, repo_name, suggested_ws, suggested_cat)
 
@@ -590,7 +620,17 @@ def add(ctx: Context, repo_name: str) -> None:
     else:
         save_config(config, ctx.config_path)
         console.print("[green]Config updated[/green]")
-        console.print("[yellow]Run 'gro apply' to create symlinks[/yellow]")
+
+        # Create symlinks for the newly added repo
+        locations = config.find_repo_locations(repo_name)
+        for ws_name, cat_path in locations:
+            workspace = config.workspaces[ws_name]
+            symlink_path = get_symlink_path(workspace.path, cat_path, repo_name)
+            if not symlink_path.exists():
+                target = config.code_path / repo_name
+                if create_symlink(symlink_path, target):
+                    display = format_symlink_path(ws_name, cat_path, repo_name)
+                    console.print(f"[green]Created symlink:[/green] {display}")
 
 
 def categorize_repo_interactive(
@@ -677,7 +717,9 @@ def categorize_repo_interactive(
 
     if choice.lower() == "n":
         default_new_cat = suggested_cat if suggested_cat and suggested_cat != "." else "."
-        cat_path = click.prompt("Category path (e.g., 'vmware/vsphere' or '.')", default=default_new_cat)
+        cat_path = click.prompt(
+            "Category path (e.g., 'vmware/vsphere' or '.')", default=default_new_cat
+        )
     else:
         try:
             idx = int(choice) - 1
@@ -687,8 +729,8 @@ def categorize_repo_interactive(
 
     # Add repo to category
     category = workspace.get_or_create_category(cat_path)
-    if repo_name not in category.repos:
-        category.repos.append(repo_name)
+    if repo_name not in category.repo_names:
+        category.entries.append(RepoEntry(repo_name=repo_name))
         console.print(f"  [green]+[/green] Added to {ws_name}/{cat_path}")
         return True
     else:
@@ -709,14 +751,52 @@ def get_repo_choices(config: Config) -> list[dict[str, str]]:
     choices: list[dict[str, str]] = []
     for ws_name, workspace in config.workspaces.items():
         for cat_path, category in workspace.categories.items():
-            for repo_name in category.repos:
-                display_path = format_symlink_path(ws_name, cat_path, repo_name)
-                full_path = str(workspace.path / cat_path / repo_name) if cat_path != "." else str(workspace.path / repo_name)
+            for entry in category.entries:
+                symlink_name = entry.symlink_name
+                display_path = format_symlink_path(ws_name, cat_path, symlink_name)
+                if cat_path != ".":
+                    full_path = str(workspace.path / cat_path / symlink_name)
+                else:
+                    full_path = str(workspace.path / symlink_name)
                 choices.append({
-                    "name": f"{repo_name} ({display_path})",
-                    "value": f"{repo_name}|{display_path}|{full_path}",
+                    "name": f"{entry.repo_name} ({display_path})",
+                    "value": f"{entry.repo_name}|{display_path}|{full_path}",
                 })
     return sorted(choices, key=lambda x: x["name"])
+
+
+@main.command()
+@pass_context
+def fmt(ctx: Context) -> None:
+    """Format the configuration file.
+
+    Sorts categories and repos alphabetically for consistent formatting.
+    """
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        raise SystemExit(1)
+
+    # Read original content to compare
+    original_content = ctx.config_path.read_text()
+
+    # Load, serialize, and format the config
+    config = ctx.config
+    data = serialize_config(config)
+
+    stream = io.StringIO()
+    yaml.dump(data, stream, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    formatted_content = stream.getvalue()
+
+    if original_content == formatted_content:
+        console.print("[green]Config already formatted![/green]")
+        return
+
+    if ctx.dry_run:
+        console.print(f"[blue]Would format:[/blue] {ctx.config_path}")
+        return
+
+    ctx.config_path.write_text(formatted_content)
+    console.print(f"[green]Formatted:[/green] {ctx.config_path}")
 
 
 @main.command()
@@ -771,7 +851,7 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
     try:
         ctx_manager = _stderr_output() if path_mode else _noop_context()
         with ctx_manager:
-            result = inquirer.fuzzy(
+            result = inquirer.fuzzy(  # type: ignore[attr-defined]
                 message="Find repo:",
                 choices=choices,
                 default=pattern or "",
@@ -781,7 +861,7 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
     except KeyboardInterrupt:
         # User cancelled with Ctrl+C
         if path_mode:
-            raise SystemExit(1)
+            raise SystemExit(1) from None
         return
 
     if not result:

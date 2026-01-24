@@ -9,7 +9,7 @@ from click.testing import CliRunner
 
 from gro.cli import main
 from gro.config import load_config, save_config
-from gro.models import Category, Config, Workspace
+from gro.models import Category, Config, RepoEntry, Workspace
 
 
 @pytest.fixture
@@ -230,7 +230,7 @@ class TestStatus:
         """Shows repos in config but not in code."""
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["missing-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="missing-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -252,7 +252,7 @@ class TestStatus:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -276,7 +276,7 @@ class TestStatus:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -352,7 +352,7 @@ class TestStatus:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -367,6 +367,34 @@ class TestStatus:
         assert result.exit_code == 0
         assert "Conflicts" in result.output
         assert "my-repo" in result.output
+
+    def test_shows_non_repo_directories(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Shows directories in code folder that are not git repos."""
+        # Create a git repo
+        (test_env["code"] / "real-repo" / ".git").mkdir(parents=True)
+
+        # Create directories without .git (not repos)
+        (test_env["code"] / "not-a-repo").mkdir()
+        (test_env["code"] / "failed-clone").mkdir()
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Non-repo directories" in result.output
+        assert "not-a-repo" in result.output
+        assert "failed-clone" in result.output
 
 
 class TestApply:
@@ -408,7 +436,7 @@ class TestApply:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -430,7 +458,9 @@ class TestApply:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["vmware/vsphere"] = Category(path="vmware/vsphere", repos=["my-repo"])
+        ws.categories["vmware/vsphere"] = Category(
+            path="vmware/vsphere", entries=[RepoEntry(repo_name="my-repo")]
+        )
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -451,7 +481,7 @@ class TestApply:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -501,10 +531,10 @@ class TestApply:
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
         # Repo "acme-project" in root category
-        ws.categories["."] = Category(path=".", repos=["acme-project"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="acme-project")])
         # Category "acme-project/git" conflicts with repo name
         ws.categories["acme-project/git"] = Category(
-            path="acme-project/git", repos=["other-repo"]
+            path="acme-project/git", entries=[RepoEntry(repo_name="other-repo")]
         )
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
@@ -532,7 +562,7 @@ class TestApply:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -583,7 +613,7 @@ class TestApply:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=nonexistent_ws)
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["nonexistent-ws"] = ws
         save_config(config, test_env["config"])
 
@@ -802,6 +832,33 @@ class TestAdd:
         config = load_config(test_env["config"])
         assert "direct-repo" in config.all_repos()
 
+    def test_creates_symlink_automatically(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Creates symlink automatically after adding repo."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "add",
+                "my-repo",
+            ],
+        )
+        assert result.exit_code == 0
+
+        # Verify symlink was created automatically
+        symlink_path = test_env["workspace"] / "my-repo"
+        assert symlink_path.is_symlink()
+        assert symlink_path.resolve() == (test_env["code"] / "my-repo").resolve()
+
 
 class TestValidate:
     """Tests for validate command."""
@@ -842,9 +899,9 @@ class TestValidate:
         """Reports category/repo path conflicts."""
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["acme-project"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="acme-project")])
         ws.categories["acme-project/git"] = Category(
-            path="acme-project/git", repos=["other-repo"]
+            path="acme-project/git", entries=[RepoEntry(repo_name="other-repo")]
         )
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
@@ -871,7 +928,7 @@ class TestValidate:
 
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -885,6 +942,116 @@ class TestValidate:
         )
         assert result.exit_code == 1
         assert "directory exists" in result.output.lower()
+
+
+class TestFmt:
+    """Tests for fmt command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "fmt",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_formats_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Formats config file with sorted categories and repos."""
+        # Create an unsorted config manually
+        config_content = """\
+code: {code}
+workspaces:
+- {workspace}
+workspace:
+  vmware/vsphere:
+  - pyvmomi
+  - acme-tools:tools
+  .:
+  - zebra-repo
+  - alpha-repo
+""".format(code=test_env["code"], workspace=test_env["workspace"])
+        test_env["config"].write_text(config_content)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "fmt",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Formatted" in result.output
+
+        # Verify the formatted content
+        formatted = test_env["config"].read_text()
+        # Repos should be sorted alphabetically
+        assert formatted.index("alpha-repo") < formatted.index("zebra-repo")
+        # Categories should be sorted (. comes before vmware/vsphere)
+        assert formatted.index(".:") < formatted.index("vmware/vsphere:")
+        # Aliased repos should be sorted by their string representation
+        assert formatted.index("acme-tools:tools") < formatted.index("pyvmomi")
+
+    def test_dry_run_no_changes(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Dry run shows what would change but doesn't modify file."""
+        config_content = """\
+code: {code}
+workspaces:
+- {workspace}
+workspace:
+  .:
+  - zebra-repo
+  - alpha-repo
+""".format(code=test_env["code"], workspace=test_env["workspace"])
+        test_env["config"].write_text(config_content)
+        original_content = test_env["config"].read_text()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--dry-run",
+                "fmt",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Would format" in result.output
+
+        # File should be unchanged
+        assert test_env["config"].read_text() == original_content
+
+    def test_already_formatted(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Shows message when config is already formatted."""
+        # Create a config using save_config (which produces formatted output)
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="alpha-repo"), RepoEntry(repo_name="zebra-repo")],
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "fmt",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "already formatted" in result.output.lower()
 
 
 class TestFind:
@@ -926,8 +1093,17 @@ class TestFind:
         """List mode shows matching repos without interactive prompt."""
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["tas-vcf", "tas-config", "other-repo"])
-        ws.categories["vmware"] = Category(path="vmware", repos=["tas-tools"])
+        ws.categories["."] = Category(
+            path=".",
+            entries=[
+                RepoEntry(repo_name="tas-vcf"),
+                RepoEntry(repo_name="tas-config"),
+                RepoEntry(repo_name="other-repo"),
+            ],
+        )
+        ws.categories["vmware"] = Category(
+            path="vmware", entries=[RepoEntry(repo_name="tas-tools")]
+        )
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -953,7 +1129,7 @@ class TestFind:
         """Path mode outputs only the selected path for cd."""
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -985,8 +1161,13 @@ class TestFind:
         """List mode without pattern shows all repos."""
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["repo-a", "repo-b"])
-        ws.categories["nested"] = Category(path="nested", repos=["repo-c"])
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="repo-a"), RepoEntry(repo_name="repo-b")],
+        )
+        ws.categories["nested"] = Category(
+            path="nested", entries=[RepoEntry(repo_name="repo-c")]
+        )
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
@@ -1011,7 +1192,7 @@ class TestFind:
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
         ws.categories["vmware/cloud-foundry"] = Category(
-            path="vmware/cloud-foundry", repos=["tas-vcf"]
+            path="vmware/cloud-foundry", entries=[RepoEntry(repo_name="tas-vcf")]
         )
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
@@ -1038,7 +1219,7 @@ class TestFind:
         """Cancelled selection in path mode exits with code 1."""
         config = Config(code_path=test_env["code"])
         ws = Workspace(path=test_env["workspace"])
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 

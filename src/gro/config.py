@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from gro.models import Category, Config, Workspace
+from gro.models import Category, Config, RepoEntry, Workspace
 
 
 class ConfigError(Exception):
@@ -109,21 +109,23 @@ def parse_config(data: dict[str, Any]) -> Config:
             if not isinstance(ws_data, dict):
                 raise ConfigError(f"Workspace '{ws_name}' config must be a mapping")
 
-            for cat_path, repos in ws_data.items():
-                if repos is None:
-                    repos = []
-                if not isinstance(repos, list):
+            for cat_path, repo_strs in ws_data.items():
+                if repo_strs is None:
+                    repo_strs = []
+                if not isinstance(repo_strs, list):
                     raise ConfigError(
                         f"Category '{cat_path}' in workspace '{ws_name}' must be a list"
                     )
-                # Validate all repos are strings
-                for repo in repos:
-                    if not isinstance(repo, str):
+                # Parse repo strings into RepoEntry objects
+                entries: list[RepoEntry] = []
+                for repo_str in repo_strs:
+                    if not isinstance(repo_str, str):
                         raise ConfigError(
-                            f"Repo names must be strings, got {type(repo).__name__} in "
+                            f"Repo names must be strings, got {type(repo_str).__name__} in "
                             f"'{ws_name}/{cat_path}'"
                         )
-                workspace.categories[cat_path] = Category(path=cat_path, repos=list(repos))
+                    entries.append(RepoEntry.from_string(repo_str))
+                workspace.categories[cat_path] = Category(path=cat_path, entries=entries)
 
         workspaces[ws_name] = workspace
 
@@ -183,8 +185,10 @@ def serialize_config(config: Config) -> dict[str, Any]:
         if workspace.categories:
             ws_data: dict[str, list[str]] = {}
             for cat_path, category in sorted(workspace.categories.items()):
-                if category.repos:  # Only include non-empty categories
-                    ws_data[cat_path] = sorted(category.repos)
+                if category.entries:  # Only include non-empty categories
+                    ws_data[cat_path] = sorted(
+                        [entry.to_string() for entry in category.entries]
+                    )
             if ws_data:
                 data[ws_name] = ws_data
 
@@ -244,10 +248,10 @@ def validate_config(config: Config) -> list[str]:
     for ws_name, workspace in config.workspaces.items():
         repo_locations: dict[str, list[str]] = {}
         for cat_path, category in workspace.categories.items():
-            for repo in category.repos:
-                if repo not in repo_locations:
-                    repo_locations[repo] = []
-                repo_locations[repo].append(cat_path)
+            for entry in category.entries:
+                if entry.repo_name not in repo_locations:
+                    repo_locations[entry.repo_name] = []
+                repo_locations[entry.repo_name].append(cat_path)
 
         # Note: Having a repo in multiple categories is allowed, just informational
         for repo, locations in repo_locations.items():
@@ -257,14 +261,30 @@ def validate_config(config: Config) -> list[str]:
                     f"{', '.join(locations)}"
                 )
 
+    # Check for duplicate symlink names within same category
+    for ws_name, workspace in config.workspaces.items():
+        for cat_path, category in workspace.categories.items():
+            symlink_names: dict[str, list[str]] = {}
+            for entry in category.entries:
+                if entry.symlink_name not in symlink_names:
+                    symlink_names[entry.symlink_name] = []
+                symlink_names[entry.symlink_name].append(entry.repo_name)
+
+            for symlink_name, repos in symlink_names.items():
+                if len(repos) > 1:
+                    warnings.append(
+                        f"Duplicate symlink name '{symlink_name}' in '{ws_name}/{cat_path}': "
+                        f"repos {', '.join(repos)}"
+                    )
+
     # Check for category paths that conflict with repo names in parent categories
     for ws_name, workspace in config.workspaces.items():
-        # Build map of category path -> repos in that category
-        category_repos: dict[str, set[str]] = {}
+        # Build map of category path -> symlink names in that category
+        category_symlinks: dict[str, set[str]] = {}
         for cat_path, category in workspace.categories.items():
-            category_repos[cat_path] = set(category.repos)
+            category_symlinks[cat_path] = category.symlink_names
 
-        # For each category, check if its path conflicts with a repo in a parent category
+        # For each category, check if its path conflicts with a symlink name in a parent
         for cat_path in workspace.categories:
             if cat_path == ".":
                 continue  # Root category can't conflict
@@ -275,16 +295,13 @@ def validate_config(config: Config) -> list[str]:
             # Check each prefix of the path
             for i in range(len(parts)):
                 # The prefix path (parent category)
-                if i == 0:
-                    parent_path = "."
-                else:
-                    parent_path = "/".join(parts[:i])
+                parent_path = "." if i == 0 else "/".join(parts[:i])
 
                 # The component that would need to be a directory
                 component = parts[i]
 
-                # Check if parent category has a repo with this name
-                if parent_path in category_repos and component in category_repos[parent_path]:
+                # Check if parent category has a symlink with this name
+                if parent_path in category_symlinks and component in category_symlinks[parent_path]:
                     warnings.append(
                         f"Category path '{cat_path}' in workspace '{ws_name}' "
                         f"conflicts with repo '{component}' in category '{parent_path}'"
