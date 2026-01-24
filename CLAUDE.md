@@ -45,10 +45,10 @@ uv run gro --help
 
 ### Module Structure
 
-- `models.py` - Dataclasses: `Config`, `Workspace`, `Category`, `RepoStatus`, `SyncPlan`
+- `models.py` - Dataclasses: `Config`, `Workspace`, `Category`, `RepoEntry`, `RepoStatus`, `SyncPlan`
 - `config.py` - YAML loading/saving, path expansion (`~` handling), validation
 - `workspace.py` - Symlink operations: scan, create, update, remove; sync planning
-- `cli.py` - Click CLI with commands: `init`, `status`, `validate`, `apply`, `sync`, `add`, `find`
+- `cli.py` - Click CLI with commands: `init`, `status`, `validate`, `apply`, `sync`, `add`, `find`, `fmt`
 
 ### Key Concepts
 
@@ -56,6 +56,7 @@ uv run gro --help
 - **Repos can exist in multiple workspaces** - no restriction on where a repo is symlinked
 - **Workspace name** is derived from directory basename (e.g., `/home/user/workspace` → `workspace`)
 - **Symlinks are relative** (e.g., `../code/repo-name`) for portability
+- **Aliased symlinks** - Use `repo_name:alias` syntax to create symlinks with different names than the repo
 
 ## Config Format
 
@@ -66,8 +67,30 @@ workspaces:
 workspace: # Categories for "workspace"
   .: # Root category - symlinks directly to workspace/
     - repo1
+    - acme-git:git # Creates symlink "git" -> acme-git repo
   vmware/vsphere: # Nested category - workspace/vmware/vsphere/
     - pyvmomi
+    - acme-tools:tools # Creates symlink "tools" -> acme-tools repo
+```
+
+### Aliased Symlinks
+
+Use `repo_name:alias` syntax to create symlinks with different names than the repository:
+
+```yaml
+vendor/projects:
+  - config-lab # Creates symlink "config-lab"
+  - acme-git:git # Creates symlink "git" pointing to acme-git repo
+  - acme-stuff:stuff # Creates symlink "stuff" pointing to acme-stuff repo
+```
+
+This creates:
+
+```
+workspace/vendor/projects/
+├── config-lab -> ../../../code/config-lab
+├── git -> ../../../code/acme-git
+└── stuff -> ../../../code/acme-stuff
 ```
 
 ## CLI Commands
@@ -81,6 +104,7 @@ workspace: # Categories for "workspace"
 - `gro find [pattern]` - Interactive fuzzy search for repos
   - `--list` - Print matches without interactive selection
   - `--path` - Output only path (for `cd "$(gro find --path)"`)
+- `gro fmt` - Format config file (sorts categories and repos alphabetically)
 
 All commands support `-h` for help.
 

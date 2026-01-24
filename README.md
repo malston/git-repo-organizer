@@ -63,6 +63,27 @@ projects:
   personal: [my-app, dotfiles]
 ```
 
+### Aliased Symlinks
+
+Use `repo_name:alias` syntax to create symlinks with different names:
+
+```yaml
+workspace:
+  vendor/tools:
+    - config-lab # Creates symlink "config-lab"
+    - acme-git:git # Creates symlink "git" -> acme-git repo
+    - acme-stuff:stuff # Creates symlink "stuff" -> acme-stuff repo
+```
+
+This creates:
+
+```
+workspace/vendor/tools/
+├── config-lab -> ../../../code/config-lab
+├── git -> ../../../code/acme-git
+└── stuff -> ../../../code/acme-stuff
+```
+
 ## Commands
 
 ### `gro init`
@@ -89,7 +110,7 @@ Create/update symlinks based on configuration.
 ```bash
 gro apply           # Create missing symlinks
 gro apply --prune   # Also remove orphaned symlinks
-gro apply -n        # Dry run - preview changes
+gro -n apply        # Dry run - preview changes
 ```
 
 ### `gro sync`
@@ -98,7 +119,7 @@ Add uncategorized repos from code directory to config.
 
 ```bash
 gro sync                    # Interactive categorization
-gro sync --non-interactive  # Add all to root category
+gro --non-interactive sync  # Add all to root category
 ```
 
 ### `gro add <repo>`
@@ -107,6 +128,37 @@ Add a specific repository to a category.
 
 ```bash
 gro add my-new-repo
+```
+
+### `gro validate`
+
+Check configuration for errors without making changes.
+
+```bash
+gro validate
+```
+
+### `gro find [pattern]`
+
+Interactive fuzzy search for repositories.
+
+```bash
+gro find              # Interactive selection of all repos
+gro find vcf          # Filter repos matching "vcf"
+gro find --list       # Print matches without interactive selection
+gro find --path vcf   # Output only path (useful for cd)
+
+# Change to a repo directory
+cd "$(gro find --path)"
+```
+
+### `gro fmt`
+
+Format the configuration file, sorting categories and repos alphabetically.
+
+```bash
+gro fmt        # Format config file
+gro -n fmt     # Dry run - preview changes
 ```
 
 ## Common Options
