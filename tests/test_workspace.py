@@ -798,6 +798,13 @@ class TestParseGitRemoteUrl:
         result = parse_git_remote_url("ssh://bitbucket.org/myteam/myrepo.git")
         assert result == ("bitbucket.org", "myteam", "myrepo")
 
+    def test_ssh_slash_format_with_username(self) -> None:
+        """Parses SSH URL with username and slash (no colon)."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("jdoe@stash.acme.com/scm/team/my-project.git")
+        assert result == ("stash.acme.com", "scm/team", "my-project")
+
     def test_nested_gitlab_groups(self) -> None:
         """Parses GitLab URL with nested groups."""
         from gro.workspace import parse_git_remote_url

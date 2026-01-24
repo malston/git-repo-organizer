@@ -59,6 +59,7 @@ def parse_git_remote_url(url: str) -> tuple[str, str, str] | None:
     Supports multiple SSH and HTTPS formats:
     - git@github.com:org/repo.git
     - user@stash.acme.com:scm/team/repo.git
+    - user@stash.acme.com/scm/team/repo.git
     - ssh://user@bitbucket.org/team/repo.git
     - ssh://bitbucket.org/team/repo.git
     - https://github.com/org/repo.git
@@ -86,6 +87,15 @@ def parse_git_remote_url(url: str) -> tuple[str, str, str] | None:
         domain = ssh_colon_match.group(1)
         org_path = ssh_colon_match.group(2)
         repo = ssh_colon_match.group(3)
+        return (domain, org_path, repo)
+
+    # SSH format with slash: user@domain/org/repo (no colon separator)
+    # Matches jdoe@stash.acme.com/scm/team/repo
+    ssh_slash_match = re.match(r"^[^@]+@([^/]+)/(.+)/([^/]+)$", url)
+    if ssh_slash_match:
+        domain = ssh_slash_match.group(1)
+        org_path = ssh_slash_match.group(2)
+        repo = ssh_slash_match.group(3)
         return (domain, org_path, repo)
 
     # SSH protocol format: ssh://user@domain/org/repo or ssh://domain/org/repo
