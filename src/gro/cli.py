@@ -272,6 +272,60 @@ def status(ctx: Context) -> None:
 
 
 @main.command()
+@pass_context
+def validate(ctx: Context) -> None:
+    """Validate configuration for errors and conflicts.
+
+    Checks for:
+    - Category paths that conflict with repo names
+    - Directories that exist where symlinks should be created
+    - Missing code or workspace directories
+    """
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        raise SystemExit(1)
+
+    config = ctx.config
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    # Run config validation
+    config_warnings = validate_config(config)
+    for warning in config_warnings:
+        if "conflicts with repo" in warning:
+            errors.append(warning)
+        else:
+            warnings.append(warning)
+
+    # Check for symlink conflicts
+    plan = create_sync_plan(config)
+    for ws_name, cat_path, repo_name in plan.symlink_conflicts:
+        errors.append(
+            f"Directory exists where symlink should be: "
+            f"{format_symlink_path(ws_name, cat_path, repo_name)}"
+        )
+
+    # Report results
+    if errors:
+        console.print("[red]Errors:[/red]")
+        for error in errors:
+            console.print(f"  [red]![/red] {error}")
+
+    if warnings:
+        console.print("[yellow]Warnings:[/yellow]")
+        for warning in warnings:
+            console.print(f"  [yellow]![/yellow] {warning}")
+
+    if errors:
+        console.print(f"\n[red]Config has {len(errors)} error(s)[/red]")
+        raise SystemExit(1)
+    elif warnings:
+        console.print(f"\n[yellow]Config valid with {len(warnings)} warning(s)[/yellow]")
+    else:
+        console.print("[green]Config is valid![/green]")
+
+
+@main.command()
 @click.option(
     "--prune",
     is_flag=True,

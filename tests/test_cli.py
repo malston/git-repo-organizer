@@ -727,3 +727,87 @@ class TestAdd:
         # Verify config was updated
         config = load_config(test_env["config"])
         assert "direct-repo" in config.all_repos()
+
+
+class TestValidate:
+    """Tests for validate command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "validate",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_valid_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Reports success for valid config."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "validate",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "valid" in result.output.lower()
+
+    def test_reports_category_repo_conflict(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Reports category/repo path conflicts."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["acme-project"])
+        ws.categories["acme-project/git"] = Category(
+            path="acme-project/git", repos=["other-repo"]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "validate",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "conflict" in result.output.lower()
+
+    def test_reports_symlink_conflicts(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Reports when directory exists where symlink should be."""
+        # Create repo in code directory
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+        # Create non-symlink directory in workspace
+        (test_env["workspace"] / "my-repo").mkdir()
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "validate",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "directory exists" in result.output.lower()
