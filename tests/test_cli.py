@@ -462,6 +462,129 @@ class TestInit:
         assert "amplifier" in symlink_names
         assert "amplifier-fork" in symlink_names
 
+    def test_auto_apply_creates_symlinks(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply creates symlinks after init when no errors or warnings."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Created 1 symlinks" in result.output
+
+        # Symlink should exist
+        symlink = test_env["workspace"] / "my-repo"
+        assert symlink.is_symlink()
+
+    def test_auto_apply_skips_on_warnings(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply skips apply when there are warnings."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        # Use non-existent workspace (generates warning)
+        nonexistent_ws = test_env["workspace"].parent / "nonexistent"
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(nonexistent_ws),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Warning:" in result.output
+        assert "Skipping auto-apply" in result.output
+        # Should NOT contain "Created" since apply was skipped
+        assert "Created" not in result.output
+
+    def test_auto_apply_skips_on_conflicts(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply skips apply when there are symlink conflicts."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create a directory where symlink should be (conflict)
+        conflict_dir = test_env["workspace"] / "my-repo"
+        conflict_dir.mkdir(parents=True)
+        (conflict_dir / "some-file.txt").touch()  # Make it non-empty
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Skipping auto-apply" in result.output
+        # Should NOT contain "Created" since apply was skipped
+        assert "Created" not in result.output
+
+    def test_auto_apply_respects_dry_run(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply respects --dry-run flag."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "--dry-run",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Dry run - no changes made" in result.output
+
+        # Config and symlink should NOT exist
+        assert not test_env["config"].exists()
+        symlink = test_env["workspace"] / "my-repo"
+        assert not symlink.exists()
+
 
 class TestStatus:
     """Tests for status command."""
@@ -937,6 +1060,28 @@ class TestApply:
                 "--config",
                 str(test_env["config"]),
                 "--non-interactive",
+                "apply",
+            ],
+        )
+        assert "Warning" in result.output
+        assert "Continue?" not in result.output
+
+    def test_skips_prompt_in_dry_run(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Skips warning prompt in dry-run mode."""
+        nonexistent_code = test_env["code"].parent / "nonexistent"
+
+        config = Config(code_path=nonexistent_code)
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--dry-run",
                 "apply",
             ],
         )

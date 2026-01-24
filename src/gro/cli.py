@@ -190,6 +190,11 @@ def main(
     is_flag=True,
     help="Include domain in category path (requires --by-org)",
 )
+@click.option(
+    "--auto-apply",
+    is_flag=True,
+    help="Automatically apply symlinks after init (skips if errors/warnings)",
+)
 @pass_context
 def init(
     ctx: Context,
@@ -198,6 +203,7 @@ def init(
     scan: bool,
     by_org: bool,
     include_domain: bool,
+    auto_apply: bool,
 ) -> None:
     """Initialize gro configuration.
 
@@ -256,6 +262,47 @@ def init(
     warnings = validate_config(config)
     for warning in warnings:
         console.print(f"[yellow]Warning:[/yellow] {warning}")
+
+    # Auto-apply if requested
+    if auto_apply:
+        # Check for blocking errors
+        blocking_errors = [w for w in warnings if "conflicts with repo" in w]
+
+        # Check for symlink conflicts
+        plan = create_sync_plan(config)
+
+        if blocking_errors or warnings or plan.symlink_conflicts:
+            console.print(
+                "\n[yellow]Skipping auto-apply due to warnings or conflicts.[/yellow]"
+            )
+            console.print("[yellow]Run 'gro apply' manually after resolving.[/yellow]")
+        elif not plan.has_changes:
+            console.print("\n[green]Nothing to apply - everything is in sync![/green]")
+        else:
+            # Apply the changes
+            if ctx.dry_run:
+                # Show what would be done
+                if plan.symlinks_to_create:
+                    console.print("\n[bold]Would create symlinks:[/bold]")
+                    for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_create:
+                        display = format_symlink_path(ws_name, cat_path, symlink_name)
+                        if symlink_name != repo_name:
+                            display += f" -> {repo_name}"
+                        console.print(f"  [green]+[/green] {display}")
+                console.print("\n[blue]Dry run - no changes made[/blue]")
+            else:
+                results = apply_sync_plan(
+                    config,
+                    plan,
+                    dry_run=False,
+                    remove_orphans=False,
+                )
+                if results["created"]:
+                    console.print(f"\n[green]Created {len(results['created'])} symlinks[/green]")
+                if results["errors"]:
+                    console.print("\n[red]Errors:[/red]")
+                    for error in results["errors"]:
+                        console.print(f"  {error}")
 
 
 @main.command()
@@ -431,8 +478,10 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
         console.print("[yellow]Warnings:[/yellow]")
         for warning in non_blocking_warnings:
             console.print(f"  [yellow]![/yellow] {warning}")
-        if not ctx.non_interactive and not click.confirm("\nContinue?", default=False):
-            return
+        # Don't prompt in non-interactive mode or dry-run mode
+        if not ctx.non_interactive and not ctx.dry_run:
+            if not click.confirm("\nContinue?", default=False):
+                return
         console.print()
 
     plan = create_sync_plan(config)

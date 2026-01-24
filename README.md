@@ -95,21 +95,23 @@ gro init --code ~/code --workspace ~/workspace
 gro init --scan                    # Scan and categorize existing repos interactively
 gro --non-interactive init --scan --by-org  # Auto-organize by git remote org
 gro --non-interactive init --scan --by-org --include-domain  # Include domain in path
+gro --non-interactive init --scan --auto-apply  # Auto-apply symlinks after init
 ```
 
 The `--by-org` flag parses each repo's git remote to extract the org/owner and creates categories automatically. Use `--include-domain` for multi-host setups (e.g., GitHub + GitHub Enterprise).
 
+The `--auto-apply` flag automatically creates symlinks after init, but only if there are no warnings or conflicts. If issues are detected, it skips apply and prompts you to run `gro apply` manually after resolving them.
+
 **Example: Create a new workspace with auto-organization**
 
 ```bash
-# Create a new config organized by org with domain paths
+# Create a new config organized by org with domain paths and auto-apply symlinks
+gro -c ~/.config/gro/config-by-org.yaml --non-interactive init --scan --by-org --include-domain --workspace ~/git --auto-apply
+
+# Or without auto-apply, do it in steps:
 gro -c ~/.config/gro/config-by-org.yaml init --scan --by-org --include-domain --workspace ~/git
-
-# Preview the symlinks that will be created
-gro -c ~/.config/gro/config-by-org.yaml -n apply
-
-# Create the symlinks
-gro -c ~/.config/gro/config-by-org.yaml apply
+gro -c ~/.config/gro/config-by-org.yaml -n apply  # Preview
+gro -c ~/.config/gro/config-by-org.yaml apply     # Apply
 ```
 
 This creates categories like `github.com/malston`, `github.enterprise.com/team`, etc.
