@@ -677,7 +677,7 @@ class TestAliasedSymlinks:
         """Mix of aliased and non-aliased repos work together."""
         code_path = tmp_path / "code"
         code_path.mkdir()
-        (code_path / "config-lab" / ".git").mkdir(parents=True)
+        (code_path / "govc" / ".git").mkdir(parents=True)
         (code_path / "acme-git" / ".git").mkdir(parents=True)
         (code_path / "acme-stuff" / ".git").mkdir(parents=True)
 
@@ -692,7 +692,7 @@ class TestAliasedSymlinks:
         ws.categories["vendor/projects"] = Category(
             path="vendor/projects",
             entries=[
-                RepoEntry(repo_name="config-lab"),  # No alias
+                RepoEntry(repo_name="govc"),  # No alias
                 RepoEntry(repo_name="acme-git", alias="git"),
                 RepoEntry(repo_name="acme-stuff", alias="stuff"),
             ],
@@ -703,8 +703,8 @@ class TestAliasedSymlinks:
 
         # Check symlinks
         base = workspace_path / "vendor" / "projects"
-        assert (base / "config-lab").is_symlink()
-        assert (base / "config-lab").resolve() == code_path / "config-lab"
+        assert (base / "govc").is_symlink()
+        assert (base / "govc").resolve() == code_path / "govc"
         assert (base / "git").is_symlink()
         assert (base / "git").resolve() == code_path / "acme-git"
         assert (base / "stuff").is_symlink()

@@ -79,7 +79,7 @@ Use `repo_name:alias` syntax to create symlinks with different names than the re
 
 ```yaml
 vendor/projects:
-  - config-lab # Creates symlink "config-lab"
+  - govc # Creates symlink "govc"
   - acme-git:git # Creates symlink "git" pointing to acme-git repo
   - acme-stuff:stuff # Creates symlink "stuff" pointing to acme-stuff repo
 ```
@@ -88,7 +88,7 @@ This creates:
 
 ```
 workspace/vendor/projects/
-├── config-lab -> ../../../code/config-lab
+├── govc -> ../../../code/govc
 ├── git -> ../../../code/acme-git
 └── stuff -> ../../../code/acme-stuff
 ```

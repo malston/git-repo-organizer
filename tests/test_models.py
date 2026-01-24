@@ -50,7 +50,7 @@ class TestRepoEntry:
 
     def test_roundtrip_no_alias(self) -> None:
         """Parsing and serializing simple repo returns original."""
-        original = "config-lab"
+        original = "govc"
         entry = RepoEntry.from_string(original)
         assert entry.to_string() == original
 
@@ -85,10 +85,10 @@ class TestCategory:
             path=".",
             entries=[
                 RepoEntry(repo_name="acme-git", alias="git"),
-                RepoEntry(repo_name="config-lab"),
+                RepoEntry(repo_name="govc"),
             ],
         )
-        assert cat.repo_names == {"acme-git", "config-lab"}
+        assert cat.repo_names == {"acme-git", "govc"}
 
     def test_symlink_names_simple(self) -> None:
         """symlink_names returns set of symlink names (repo names when no alias)."""
@@ -108,10 +108,10 @@ class TestCategory:
             entries=[
                 RepoEntry(repo_name="acme-git", alias="git"),
                 RepoEntry(repo_name="acme-stuff", alias="stuff"),
-                RepoEntry(repo_name="config-lab"),
+                RepoEntry(repo_name="govc"),
             ],
         )
-        assert cat.symlink_names == {"git", "stuff", "config-lab"}
+        assert cat.symlink_names == {"git", "stuff", "govc"}
 
 
 class TestWorkspace:
@@ -162,10 +162,10 @@ class TestWorkspace:
             path="cat1",
             entries=[
                 RepoEntry(repo_name="acme-git", alias="git"),
-                RepoEntry(repo_name="config-lab"),
+                RepoEntry(repo_name="govc"),
             ],
         )
-        assert ws.all_repos() == {"acme-git", "config-lab"}
+        assert ws.all_repos() == {"acme-git", "govc"}
 
     def test_find_repo_categories(self) -> None:
         """Find categories containing a repo."""
