@@ -216,6 +216,14 @@ def init(
 
     Creates a config file with the specified code and workspace directories.
     """
+    # Validate flag dependencies
+    if by_org and not scan:
+        console.print("[red]Error:[/red] --by-org requires --scan")
+        raise SystemExit(1)
+    if include_domain and not by_org:
+        console.print("[red]Error:[/red] --include-domain requires --by-org")
+        raise SystemExit(1)
+
     if (
         ctx.has_config()
         and not ctx.non_interactive
@@ -295,8 +303,10 @@ def init(
                                 item.unlink()
                             removed_count += 1
                     if removed_count > 0 and not ctx.dry_run:
+                        ws_name = workspace.path.name
                         console.print(
-                            f"[yellow]Removed {removed_count} existing symlinks from {workspace.path.name}[/yellow]"
+                            f"[yellow]Removed {removed_count} existing symlinks "
+                            f"from {ws_name}[/yellow]"
                         )
                     # Clean up empty directories
                     if not ctx.dry_run:
@@ -542,9 +552,12 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
         for warning in non_blocking_warnings:
             console.print(f"  [yellow]![/yellow] {warning}")
         # Don't prompt in non-interactive mode or dry-run mode
-        if not ctx.non_interactive and not ctx.dry_run:
-            if not click.confirm("\nContinue?", default=False):
-                return
+        if (
+            not ctx.non_interactive
+            and not ctx.dry_run
+            and not click.confirm("\nContinue?", default=False)
+        ):
+            return
         console.print()
 
     plan = create_sync_plan(config)
@@ -783,6 +796,7 @@ def _organize_repos_by_org(
         return
 
     first_ws = next(iter(config.workspaces.values()))
+    organized_count = 0
 
     for repo_name in repos:
         repo_path = config.code_path / repo_name
@@ -792,6 +806,7 @@ def _organize_repos_by_org(
             # No remotes, add to root category
             category = first_ws.get_or_create_category(".")
             category.entries.append(RepoEntry(repo_name=repo_name))
+            organized_count += 1
             continue
 
         # Get the remote URL to use
@@ -832,6 +847,7 @@ def _organize_repos_by_org(
             # Couldn't parse, add to root category
             category = first_ws.get_or_create_category(".")
             category.entries.append(RepoEntry(repo_name=repo_name))
+            organized_count += 1
             continue
 
         domain, org, remote_repo_name = parsed
@@ -874,11 +890,13 @@ def _organize_repos_by_org(
                 continue
 
         category.entries.append(entry)
+        organized_count += 1
 
     # Report results
-    total = len(repos)
     categories = len(first_ws.categories)
-    console.print(f"Organized {total} repos into {categories} categories")
+    repo_word = "repo" if organized_count == 1 else "repos"
+    cat_word = "category" if categories == 1 else "categories"
+    console.print(f"Organized {organized_count} {repo_word} into {categories} {cat_word}")
 
 
 def categorize_repo_interactive(

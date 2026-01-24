@@ -195,6 +195,45 @@ class TestInit:
         config = load_config(test_env["config"])
         assert "my-repo" in config.all_repos()
 
+    def test_by_org_requires_scan(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """--by-org requires --scan flag."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "--by-org requires --scan" in result.output
+
+    def test_include_domain_requires_by_org(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--include-domain requires --by-org flag."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--include-domain",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "--include-domain requires --by-org" in result.output
+
     def test_warns_on_missing_dirs(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
         """Shows warnings for missing directories."""
         result = runner.invoke(
@@ -283,7 +322,10 @@ class TestInit:
         repo2.mkdir()
         subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
         subprocess.run(
-            ["git", "remote", "add", "origin", "git@github.enterprise.com:malston/internal-repo.git"],
+            [
+                "git", "remote", "add", "origin",
+                "git@github.acme.com:acme/internal-repo.git",
+            ],
             cwd=repo2,
             capture_output=True,
         )
@@ -311,9 +353,9 @@ class TestInit:
 
         # Categories should include domain
         assert "github.com/malston" in ws.categories
-        assert "github.enterprise.com/malston" in ws.categories
+        assert "github.acme.com/acme" in ws.categories
         assert "public-repo" in ws.categories["github.com/malston"].repo_names
-        assert "internal-repo" in ws.categories["github.enterprise.com/malston"].repo_names
+        assert "internal-repo" in ws.categories["github.acme.com/acme"].repo_names
 
     def test_scan_by_org_no_remote_goes_to_root(
         self, runner: CliRunner, test_env: dict[str, Path]
@@ -450,28 +492,29 @@ class TestInit:
         # The other should use its local name (no duplicate "amplifier")
         assert len(symlink_names) == 2  # Two unique names
 
-    def test_scan_by_org_warns_on_unresolvable_conflict(
+    def test_scan_by_org_falls_back_to_local_name_when_alias_conflicts(
         self, runner: CliRunner, test_env: dict[str, Path]
     ) -> None:
-        """Warns when a repo cannot be placed due to unresolvable conflict."""
+        """Falls back to local dir name when preferred alias is already taken."""
         import subprocess
 
-        # Create repo "amplifier" (local name matches remote name)
+        # Create repo "amplifier" - local name matches remote name, gets symlink "amplifier"
         repo1 = test_env["code"] / "amplifier"
         repo1.mkdir()
         subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
         subprocess.run(
-            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            ["git", "remote", "add", "origin", "git@github.com:acme/amplifier.git"],
             cwd=repo1,
             capture_output=True,
         )
 
-        # Create another repo that also wants "amplifier" as symlink name
+        # Create repo "amplifier-fork" - would prefer alias "amplifier" but it's taken,
+        # so falls back to local name "amplifier-fork"
         repo2 = test_env["code"] / "amplifier-fork"
         repo2.mkdir()
         subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
         subprocess.run(
-            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            ["git", "remote", "add", "origin", "git@github.com:acme/amplifier.git"],
             cwd=repo2,
             capture_output=True,
         )
@@ -493,15 +536,67 @@ class TestInit:
         )
         assert result.exit_code == 0
 
-        # Should have both - first gets alias, second uses local name
+        # Both repos should be placed
         config = load_config(test_env["config"])
         ws = config.workspaces["workspace"]
-        entries = ws.categories["microsoft"].entries
+        entries = ws.categories["acme"].entries
         symlink_names = {e.symlink_name for e in entries}
 
-        # amplifier (from repo1, no alias needed) and amplifier-fork (local name)
+        # amplifier (from repo1, no alias needed) and amplifier-fork (local name fallback)
         assert "amplifier" in symlink_names
         assert "amplifier-fork" in symlink_names
+
+    def test_scan_by_org_reports_correct_organized_count(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Reports correct organized count when repos are skipped due to conflicts."""
+        import subprocess
+
+        # Create repo "aaa-bar-fork" with remote "bar" - processed first alphabetically
+        # Takes symlink alias "bar"
+        repo1 = test_env["code"] / "aaa-bar-fork"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:acme/bar.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        # Create repo "bar" with remote "bar" - processed second
+        # This creates an unresolvable conflict because:
+        # - The symlink name "bar" is already taken by repo1's alias
+        # - Local name "bar" would also use "bar" (same as remote name)
+        repo2 = test_env["code"] / "bar"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:acme/bar.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        # Should report 1 organized (not 2) since one repo was skipped
+        assert "Organized 1 repo" in result.output
+        # Should warn about the skipped repo
+        assert "Cannot place 'bar'" in result.output
 
     def test_auto_apply_creates_symlinks(
         self, runner: CliRunner, test_env: dict[str, Path]
