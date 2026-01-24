@@ -130,7 +130,8 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
     "--config",
     "-c",
     type=click.Path(path_type=Path),
-    help="Path to config file",
+    envvar="GRO_CONFIG",
+    help="Path to config file (env: GRO_CONFIG)",
 )
 @click.option(
     "--dry-run",

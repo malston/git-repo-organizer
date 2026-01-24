@@ -63,6 +63,47 @@ class TestMain:
         assert result.exit_code == 0
         assert "Would save config" in result.output
 
+    def test_config_from_env_var(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Config path can be set via GRO_CONFIG environment variable."""
+        result = runner.invoke(
+            main,
+            [
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+            ],
+            env={"GRO_CONFIG": str(test_env["config"])},
+        )
+        assert result.exit_code == 0
+        assert test_env["config"].exists()
+
+    def test_config_flag_overrides_env_var(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--config flag takes precedence over GRO_CONFIG env var."""
+        env_config = test_env["config"].parent / "env-config.yaml"
+        flag_config = test_env["config"]
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(flag_config),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+            ],
+            env={"GRO_CONFIG": str(env_config)},
+        )
+        assert result.exit_code == 0
+        # Flag config should be used, not env var config
+        assert flag_config.exists()
+        assert not env_config.exists()
+
 
 class TestInit:
     """Tests for init command."""
