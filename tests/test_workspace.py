@@ -777,6 +777,27 @@ class TestParseGitRemoteUrl:
         assert parse_git_remote_url("not-a-url") is None
         assert parse_git_remote_url("") is None
 
+    def test_ssh_with_username(self) -> None:
+        """Parses SSH URL with non-git username."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("jdoe@stash.acme.com:scm/team/my-project.git")
+        assert result == ("stash.acme.com", "scm/team", "my-project")
+
+    def test_ssh_protocol_url(self) -> None:
+        """Parses ssh:// protocol URL."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("ssh://user@bitbucket.org/myteam/myrepo.git")
+        assert result == ("bitbucket.org", "myteam", "myrepo")
+
+    def test_ssh_protocol_url_no_user(self) -> None:
+        """Parses ssh:// protocol URL without username."""
+        from gro.workspace import parse_git_remote_url
+
+        result = parse_git_remote_url("ssh://bitbucket.org/myteam/myrepo.git")
+        assert result == ("bitbucket.org", "myteam", "myrepo")
+
     def test_nested_gitlab_groups(self) -> None:
         """Parses GitLab URL with nested groups."""
         from gro.workspace import parse_git_remote_url

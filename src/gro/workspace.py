@@ -56,9 +56,12 @@ def parse_git_remote_url(url: str) -> tuple[str, str, str] | None:
     """
     Parse a git remote URL to extract domain, org, and repo name.
 
-    Supports both SSH and HTTPS formats:
-    - git@github.com:malston/homelab.git
-    - https://github.com/malston/homelab.git
+    Supports multiple SSH and HTTPS formats:
+    - git@github.com:org/repo.git
+    - user@stash.acme.com:scm/team/repo.git
+    - ssh://user@bitbucket.org/team/repo.git
+    - ssh://bitbucket.org/team/repo.git
+    - https://github.com/org/repo.git
 
     Args:
         url: The git remote URL.
@@ -76,12 +79,21 @@ def parse_git_remote_url(url: str) -> tuple[str, str, str] | None:
     if url.endswith(".git"):
         url = url[:-4]
 
-    # SSH format: git@domain:org/repo or git@domain:org/subgroup/repo
-    ssh_match = re.match(r"^git@([^:]+):(.+)/([^/]+)$", url)
-    if ssh_match:
-        domain = ssh_match.group(1)
-        org_path = ssh_match.group(2)
-        repo = ssh_match.group(3)
+    # SSH format with colon: user@domain:org/repo or user@domain:org/subgroup/repo
+    # Matches git@, jdoe@, F8YEUOV@, etc.
+    ssh_colon_match = re.match(r"^[^@]+@([^:]+):(.+)/([^/]+)$", url)
+    if ssh_colon_match:
+        domain = ssh_colon_match.group(1)
+        org_path = ssh_colon_match.group(2)
+        repo = ssh_colon_match.group(3)
+        return (domain, org_path, repo)
+
+    # SSH protocol format: ssh://user@domain/org/repo or ssh://domain/org/repo
+    ssh_protocol_match = re.match(r"^ssh://(?:[^@]+@)?([^/]+)/(.+)/([^/]+)$", url)
+    if ssh_protocol_match:
+        domain = ssh_protocol_match.group(1)
+        org_path = ssh_protocol_match.group(2)
+        repo = ssh_protocol_match.group(3)
         return (domain, org_path, repo)
 
     # HTTPS format: https://domain/org/repo or https://domain/org/subgroup/repo
