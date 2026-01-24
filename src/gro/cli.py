@@ -742,23 +742,49 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
         return
 
     # Interactive fuzzy selection
-    result = inquirer.fuzzy(
-        message="Find repo:",
-        choices=choices,
-        default=pattern or "",
-        match_exact=False,
-        border=True,
-    ).execute()
+    # For --path mode, render TUI to stderr so stdout is clean for cd
+    from prompt_toolkit.output import create_output
+    import sys
 
-    if result:
-        repo_name, display_path, full_path = result.split("|")
+    try:
         if path_mode:
-            # Output only the path for command substitution
-            click.echo(full_path)
+            output = create_output(stdout=sys.stderr)
+            result = inquirer.fuzzy(
+                message="Find repo:",
+                choices=choices,
+                default=pattern or "",
+                match_exact=False,
+                border=True,
+                output=output,
+            ).execute()
         else:
-            console.print(f"\n[bold]{repo_name}[/bold]")
-            console.print(f"  Location: {display_path}")
-            console.print(f"  Path: [green]{full_path}[/green]")
+            result = inquirer.fuzzy(
+                message="Find repo:",
+                choices=choices,
+                default=pattern or "",
+                match_exact=False,
+                border=True,
+            ).execute()
+    except KeyboardInterrupt:
+        # User cancelled with Ctrl+C
+        if path_mode:
+            raise SystemExit(1)
+        return
+
+    if not result:
+        # User cancelled or no selection
+        if path_mode:
+            raise SystemExit(1)
+        return
+
+    repo_name, display_path, full_path = result.split("|")
+    if path_mode:
+        # Output only the path for command substitution
+        click.echo(full_path)
+    else:
+        console.print(f"\n[bold]{repo_name}[/bold]")
+        console.print(f"  Location: {display_path}")
+        console.print(f"  Path: [green]{full_path}[/green]")
 
 
 if __name__ == "__main__":
