@@ -35,6 +35,47 @@ uv run gro status
 uv run gro --help
 ```
 
+## Development Workflow with uv
+
+### Key uv Commands
+
+| Command                 | Purpose                                               |
+| ----------------------- | ----------------------------------------------------- |
+| `uv sync`               | Install project deps to local `.venv` for development |
+| `uv run <cmd>`          | Run command using project's `.venv`                   |
+| `uv tool install <pkg>` | Install package as global CLI tool                    |
+
+### Testing Changes
+
+`uv run gro` uses your current source code directly -- no reinstall needed between changes:
+
+```bash
+# Make changes to src/gro/*.py
+make test              # Verify tests pass
+uv run gro status      # Manual testing with current code
+make check             # Full validation (lint + typecheck + test)
+```
+
+### Where uv run Works
+
+`uv run` searches upward for `pyproject.toml`, so it works anywhere within the project tree:
+
+```bash
+cd ~/code/git-repo-organizer          # ✓
+cd ~/code/git-repo-organizer/src      # ✓
+cd ~/code/git-repo-organizer/tests    # ✓
+cd ~/some-other-project               # ✗ (no pyproject.toml for gro)
+```
+
+### Global Install Options
+
+If you need `gro` available outside the project directory:
+
+```bash
+make install                    # Stable global install
+uv tool install -e --force .    # Editable global install (reflects source changes)
+```
+
 ## Architecture
 
 ### Data Flow
