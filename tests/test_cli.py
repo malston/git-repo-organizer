@@ -1054,6 +1054,209 @@ workspace:
         assert "already formatted" in result.output.lower()
 
 
+class TestCat:
+    """Tests for cat command group."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "ls",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_ls_empty(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Lists no categories when none exist."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "ls",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "No categories" in result.output
+
+    def test_ls_shows_categories(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Lists all categories across workspaces."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="repo1")])
+        ws.categories["vmware/vsphere"] = Category(
+            path="vmware/vsphere", entries=[RepoEntry(repo_name="pyvmomi")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "ls",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "workspace" in result.output
+        assert "." in result.output or "(root)" in result.output
+        assert "vmware/vsphere" in result.output
+
+    def test_ls_shows_repo_counts(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Lists categories with repo counts."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="repo1"), RepoEntry(repo_name="repo2")],
+        )
+        ws.categories["tools"] = Category(
+            path="tools", entries=[RepoEntry(repo_name="tool1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "ls",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should show repo counts
+        assert "2" in result.output  # root has 2 repos
+        assert "1" in result.output  # tools has 1 repo
+
+    def test_add_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "add",
+                "new-category",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_add_creates_category(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Adds a new empty category."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "add",
+                "vmware/vsphere",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Added" in result.output or "Created" in result.output
+
+        # Verify config was updated
+        config = load_config(test_env["config"])
+        assert "vmware/vsphere" in config.workspaces["workspace"].categories
+
+    def test_add_to_specific_workspace(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Adds category to specific workspace with -w flag."""
+        ws2 = test_env["workspace"].parent / "projects"
+        ws2.mkdir()
+
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        config.workspaces["projects"] = Workspace(path=ws2)
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "add",
+                "-w",
+                "projects",
+                "personal",
+            ],
+        )
+        assert result.exit_code == 0
+
+        # Verify it was added to the correct workspace
+        config = load_config(test_env["config"])
+        assert "personal" in config.workspaces["projects"].categories
+        assert "personal" not in config.workspaces["workspace"].categories
+
+    def test_add_already_exists(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Shows message if category already exists."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["existing"] = Category(path="existing", entries=[])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "cat",
+                "add",
+                "existing",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "already exists" in result.output.lower()
+
+    def test_add_dry_run(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Dry run doesn't modify config."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--dry-run",
+                "cat",
+                "add",
+                "new-category",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Would" in result.output
+
+        # Verify config was not modified
+        config = load_config(test_env["config"])
+        assert "new-category" not in config.workspaces["workspace"].categories
+
+
 class TestFind:
     """Tests for find command."""
 

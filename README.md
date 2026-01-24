@@ -161,6 +161,16 @@ gro fmt        # Format config file
 gro -n fmt     # Dry run - preview changes
 ```
 
+### `gro cat`
+
+Manage categories in workspaces.
+
+```bash
+gro cat ls                    # List all categories with repo counts
+gro cat add vmware/vsphere    # Add new category to first workspace
+gro cat add -w projects tools # Add category to specific workspace
+```
+
 ## Common Options
 
 - `--config/-c PATH` - Use custom config file
