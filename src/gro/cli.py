@@ -743,20 +743,31 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
 
     # Interactive fuzzy selection
     # For --path mode, render TUI to stderr so stdout is clean for cd
-    from prompt_toolkit.output import create_output
     import sys
+    from contextlib import contextmanager
+
+    @contextmanager
+    def stderr_output():
+        """Redirect prompt_toolkit output to stderr for --path mode."""
+        from prompt_toolkit.application import create_app_session
+        from prompt_toolkit.input import create_input
+        from prompt_toolkit.output import create_output
+
+        inp = create_input()
+        out = create_output(stdout=sys.stderr)
+        with create_app_session(input=inp, output=out):
+            yield
 
     try:
         if path_mode:
-            output = create_output(stdout=sys.stderr)
-            result = inquirer.fuzzy(
-                message="Find repo:",
-                choices=choices,
-                default=pattern or "",
-                match_exact=False,
-                border=True,
-                output=output,
-            ).execute()
+            with stderr_output():
+                result = inquirer.fuzzy(
+                    message="Find repo:",
+                    choices=choices,
+                    default=pattern or "",
+                    match_exact=False,
+                    border=True,
+                ).execute()
         else:
             result = inquirer.fuzzy(
                 message="Find repo:",
