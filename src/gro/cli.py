@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 
 import click
+from InquirerPy import inquirer
 from rich.console import Console
 
 from gro.config import (
@@ -701,14 +702,21 @@ def get_repo_choices(config: Config) -> list[dict[str, str]]:
     is_flag=True,
     help="List matching repos without interactive selection",
 )
+@click.option(
+    "--path", "-p",
+    "path_mode",
+    is_flag=True,
+    help="Output only the path (for use with cd)",
+)
 @pass_context
-def find(ctx: Context, pattern: str | None, list_mode: bool) -> None:
+def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) -> None:
     """Find a repository using fuzzy search.
 
     Opens an interactive fuzzy finder to search through all configured repos.
     Select a repo to see its full path.
 
     Use --list to print matches without interactive selection.
+    Use --path to output only the path (for cd integration).
     """
     if not ctx.has_config():
         console.print(f"[red]Config not found:[/red] {ctx.config_path}")
@@ -734,8 +742,6 @@ def find(ctx: Context, pattern: str | None, list_mode: bool) -> None:
         return
 
     # Interactive fuzzy selection
-    from InquirerPy import inquirer
-
     result = inquirer.fuzzy(
         message="Find repo:",
         choices=choices,
@@ -746,9 +752,13 @@ def find(ctx: Context, pattern: str | None, list_mode: bool) -> None:
 
     if result:
         repo_name, display_path, full_path = result.split("|")
-        console.print(f"\n[bold]{repo_name}[/bold]")
-        console.print(f"  Location: {display_path}")
-        console.print(f"  Path: [green]{full_path}[/green]")
+        if path_mode:
+            # Output only the path for command substitution
+            click.echo(full_path)
+        else:
+            console.print(f"\n[bold]{repo_name}[/bold]")
+            console.print(f"  Location: {display_path}")
+            console.print(f"  Path: [green]{full_path}[/green]")
 
 
 if __name__ == "__main__":

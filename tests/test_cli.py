@@ -946,3 +946,35 @@ class TestFind:
         assert "tas-config" in result.output
         assert "tas-tools" in result.output
         assert "other-repo" not in result.output
+
+    def test_path_mode_outputs_path_only(
+        self, runner: CliRunner, test_env: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Path mode outputs only the selected path for cd."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # Mock the fuzzy selector to return a selection
+        def mock_fuzzy(*args, **kwargs):
+            class MockPrompt:
+                def execute(self):
+                    return f"my-repo|workspace/my-repo|{test_env['workspace']}/my-repo"
+            return MockPrompt()
+
+        monkeypatch.setattr("gro.cli.inquirer.fuzzy", mock_fuzzy)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--path",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should output only the path, no extra formatting
+        assert result.output.strip() == str(test_env["workspace"] / "my-repo")
