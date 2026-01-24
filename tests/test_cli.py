@@ -491,6 +491,48 @@ class TestInit:
         symlink = test_env["workspace"] / "my-repo"
         assert symlink.is_symlink()
 
+    def test_overwrite_skips_prompt_and_cleans_workspace(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--overwrite skips config prompt and removes existing symlinks."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create existing config
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="old-repo")])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # Create existing symlink that should be removed
+        old_symlink = test_env["workspace"] / "old-repo"
+        old_symlink.symlink_to(test_env["code"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--overwrite",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should not prompt for overwrite
+        assert "Overwrite?" not in result.output
+        # Old symlink should be removed
+        assert not old_symlink.exists()
+        # New symlink should be created
+        assert (test_env["workspace"] / "my-repo").is_symlink()
+
     def test_auto_apply_creates_workspace_dir(
         self, runner: CliRunner, test_env: dict[str, Path]
     ) -> None:

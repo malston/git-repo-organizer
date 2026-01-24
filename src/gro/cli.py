@@ -195,6 +195,11 @@ def main(
     is_flag=True,
     help="Automatically apply symlinks after init (skips if errors/warnings)",
 )
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Overwrite existing config and clean workspace symlinks",
+)
 @pass_context
 def init(
     ctx: Context,
@@ -204,6 +209,7 @@ def init(
     by_org: bool,
     include_domain: bool,
     auto_apply: bool,
+    overwrite: bool,
 ) -> None:
     """Initialize gro configuration.
 
@@ -212,6 +218,7 @@ def init(
     if (
         ctx.has_config()
         and not ctx.non_interactive
+        and not overwrite
         and not click.confirm(f"Config already exists at {ctx.config_path}. Overwrite?")
     ):
         console.print("[yellow]Aborted[/yellow]")
@@ -273,6 +280,26 @@ def init(
                 else:
                     workspace.path.mkdir(parents=True, exist_ok=True)
                     console.print(f"[green]Created:[/green] {workspace.path}")
+
+        # Clean up existing symlinks if --overwrite
+        if overwrite:
+            for workspace in config.workspaces.values():
+                if workspace.path.exists():
+                    removed_count = 0
+                    for item in workspace.path.rglob("*"):
+                        if item.is_symlink():
+                            if ctx.dry_run:
+                                console.print(f"[blue]Would remove:[/blue] {item}")
+                            else:
+                                item.unlink()
+                            removed_count += 1
+                    if removed_count > 0 and not ctx.dry_run:
+                        console.print(
+                            f"[yellow]Removed {removed_count} existing symlinks from {workspace.path.name}[/yellow]"
+                        )
+                    # Clean up empty directories
+                    if not ctx.dry_run:
+                        cleanup_empty_directories(workspace.path, dry_run=False)
 
         # Re-validate after creating directories
         warnings = validate_config(config)
