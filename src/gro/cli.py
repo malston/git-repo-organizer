@@ -31,7 +31,7 @@ from gro.config import (
     serialize_config,
     validate_config,
 )
-from gro.models import Config, RepoEntry
+from gro.models import Category, Config, RepoEntry
 from gro.workspace import (
     apply_sync_plan,
     cleanup_empty_directories,
@@ -797,6 +797,85 @@ def fmt(ctx: Context) -> None:
 
     ctx.config_path.write_text(formatted_content)
     console.print(f"[green]Formatted:[/green] {ctx.config_path}")
+
+
+@main.group()
+@pass_context
+def cat(ctx: Context) -> None:
+    """Manage categories in workspaces."""
+    pass
+
+
+@cat.command("ls")
+@pass_context
+def cat_ls(ctx: Context) -> None:
+    """List all categories."""
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        raise SystemExit(1)
+
+    config = ctx.config
+    has_categories = False
+
+    for ws_name, workspace in config.workspaces.items():
+        if workspace.categories:
+            has_categories = True
+            console.print(f"\n[bold]{ws_name}[/bold]")
+            for cat_path in sorted(workspace.categories.keys()):
+                category = workspace.categories[cat_path]
+                repo_count = len(category.entries)
+                display_path = "(root)" if cat_path == "." else cat_path
+                console.print(f"  {display_path} ({repo_count} repos)")
+
+    if not has_categories:
+        console.print("[yellow]No categories configured.[/yellow]")
+
+
+@cat.command("add")
+@click.argument("category_path")
+@click.option(
+    "--workspace",
+    "-w",
+    "workspace_name",
+    help="Workspace to add category to (uses first workspace if not specified)",
+)
+@pass_context
+def cat_add(ctx: Context, category_path: str, workspace_name: str | None) -> None:
+    """Add a new category to a workspace."""
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        raise SystemExit(1)
+
+    config = ctx.config
+
+    # Determine target workspace
+    if workspace_name:
+        if workspace_name not in config.workspaces:
+            console.print(f"[red]Workspace not found:[/red] {workspace_name}")
+            raise SystemExit(1)
+        workspace = config.workspaces[workspace_name]
+    else:
+        # Use first workspace
+        workspace_name = next(iter(config.workspaces.keys()))
+        workspace = config.workspaces[workspace_name]
+
+    # Check if category already exists
+    if category_path in workspace.categories:
+        console.print(
+            f"[yellow]Category '{category_path}' already exists in {workspace_name}[/yellow]"
+        )
+        return
+
+    if ctx.dry_run:
+        console.print(
+            f"[blue]Would add category:[/blue] {category_path} to {workspace_name}"
+        )
+        return
+
+    # Create the category
+    workspace.categories[category_path] = Category(path=category_path, entries=[])
+    save_config(config, ctx.config_path)
+    console.print(f"[green]Added category:[/green] {category_path} to {workspace_name}")
 
 
 @main.command()

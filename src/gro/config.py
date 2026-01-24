@@ -185,10 +185,9 @@ def serialize_config(config: Config) -> dict[str, Any]:
         if workspace.categories:
             ws_data: dict[str, list[str]] = {}
             for cat_path, category in sorted(workspace.categories.items()):
-                if category.entries:  # Only include non-empty categories
-                    ws_data[cat_path] = sorted(
-                        [entry.to_string() for entry in category.entries]
-                    )
+                ws_data[cat_path] = sorted(
+                    [entry.to_string() for entry in category.entries]
+                )
             if ws_data:
                 data[ws_name] = ws_data
 

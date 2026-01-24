@@ -48,7 +48,7 @@ uv run gro --help
 - `models.py` - Dataclasses: `Config`, `Workspace`, `Category`, `RepoEntry`, `RepoStatus`, `SyncPlan`
 - `config.py` - YAML loading/saving, path expansion (`~` handling), validation
 - `workspace.py` - Symlink operations: scan, create, update, remove; sync planning
-- `cli.py` - Click CLI with commands: `init`, `status`, `validate`, `apply`, `sync`, `add`, `find`, `fmt`
+- `cli.py` - Click CLI with commands: `init`, `status`, `validate`, `apply`, `sync`, `add`, `find`, `fmt`, `cat`
 
 ### Key Concepts
 
@@ -105,6 +105,8 @@ workspace/vendor/projects/
   - `--list` - Print matches without interactive selection
   - `--path` - Output only path (for `cd "$(gro find --path)"`)
 - `gro fmt` - Format config file (sorts categories and repos alphabetically)
+- `gro cat ls` - List all categories with repo counts
+- `gro cat add <path>` - Add a new category (`-w` to specify workspace)
 
 All commands support `-h` for help.
 
