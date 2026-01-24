@@ -291,6 +291,17 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
         raise SystemExit(1)
 
     config = ctx.config
+
+    # Check for config errors that would cause broken symlinks
+    warnings = validate_config(config)
+    blocking_warnings = [w for w in warnings if "conflicts with repo" in w]
+    if blocking_warnings:
+        console.print("[red]Cannot apply - config has errors:[/red]")
+        for warning in blocking_warnings:
+            console.print(f"  [red]![/red] {warning}")
+        console.print("\n[yellow]Fix the config before applying.[/yellow]")
+        raise SystemExit(1)
+
     plan = create_sync_plan(config)
 
     if not plan.has_changes:

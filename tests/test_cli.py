@@ -490,6 +490,37 @@ class TestApply:
         assert "Removed 1 symlinks" in result.output
         assert not (test_env["workspace"] / "orphan").exists()
 
+    def test_refuses_with_category_repo_conflict(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Refuses to apply when category path conflicts with repo name."""
+        # Create repo in code directory
+        (test_env["code"] / "acme-project" / ".git").mkdir(parents=True)
+
+        # Config with conflicting category/repo
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        # Repo "acme-project" in root category
+        ws.categories["."] = Category(path=".", repos=["acme-project"])
+        # Category "acme-project/git" conflicts with repo name
+        ws.categories["acme-project/git"] = Category(
+            path="acme-project/git", repos=["other-repo"]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Cannot apply" in result.output
+        assert "config has errors" in result.output
+
 
 class TestSync:
     """Tests for sync command."""
