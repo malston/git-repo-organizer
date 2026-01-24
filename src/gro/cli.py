@@ -37,7 +37,9 @@ from gro.workspace import (
     cleanup_empty_directories,
     create_symlink,
     create_sync_plan,
+    get_repo_remotes,
     get_symlink_path,
+    parse_git_remote_url,
     scan_code_dir,
     scan_non_repos,
     scan_workspace_non_symlinks,
@@ -128,7 +130,8 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
     "--config",
     "-c",
     type=click.Path(path_type=Path),
-    help="Path to config file",
+    envvar="GRO_CONFIG",
+    help="Path to config file (env: GRO_CONFIG)",
 )
 @click.option(
     "--dry-run",
@@ -178,20 +181,53 @@ def main(
     is_flag=True,
     help="Scan existing repos and prompt for categorization",
 )
+@click.option(
+    "--by-org",
+    is_flag=True,
+    help="Organize repos by git remote org (requires --scan)",
+)
+@click.option(
+    "--include-domain",
+    is_flag=True,
+    help="Include domain in category path (requires --by-org)",
+)
+@click.option(
+    "--auto-apply",
+    is_flag=True,
+    help="Automatically apply symlinks after init (skips if errors/warnings)",
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Overwrite existing config and clean workspace symlinks",
+)
 @pass_context
 def init(
     ctx: Context,
     code: Path | None,
     workspaces: tuple[Path, ...],
     scan: bool,
+    by_org: bool,
+    include_domain: bool,
+    auto_apply: bool,
+    overwrite: bool,
 ) -> None:
     """Initialize gro configuration.
 
     Creates a config file with the specified code and workspace directories.
     """
+    # Validate flag dependencies
+    if by_org and not scan:
+        console.print("[red]Error:[/red] --by-org requires --scan")
+        raise SystemExit(1)
+    if include_domain and not by_org:
+        console.print("[red]Error:[/red] --include-domain requires --by-org")
+        raise SystemExit(1)
+
     if (
         ctx.has_config()
         and not ctx.non_interactive
+        and not overwrite
         and not click.confirm(f"Config already exists at {ctx.config_path}. Overwrite?")
     ):
         console.print("[yellow]Aborted[/yellow]")
@@ -215,7 +251,12 @@ def init(
         if repos:
             console.print(f"\nFound {len(repos)} repositories in {config.code_path}")
 
-            if not ctx.non_interactive:
+            if by_org:
+                # Organize by git remote org
+                _organize_repos_by_org(
+                    config, repos, include_domain, ctx.non_interactive
+                )
+            elif not ctx.non_interactive:
                 for repo in repos:
                     categorize_repo_interactive(config, repo)
             else:
@@ -237,6 +278,81 @@ def init(
     warnings = validate_config(config)
     for warning in warnings:
         console.print(f"[yellow]Warning:[/yellow] {warning}")
+
+    # Auto-apply if requested
+    if auto_apply:
+        # Create workspace directories if they don't exist
+        for workspace in config.workspaces.values():
+            if not workspace.path.exists():
+                if ctx.dry_run:
+                    console.print(f"[blue]Would create:[/blue] {workspace.path}")
+                else:
+                    workspace.path.mkdir(parents=True, exist_ok=True)
+                    console.print(f"[green]Created:[/green] {workspace.path}")
+
+        # Clean up existing symlinks if --overwrite
+        if overwrite:
+            for workspace in config.workspaces.values():
+                if workspace.path.exists():
+                    removed_count = 0
+                    for item in workspace.path.rglob("*"):
+                        if item.is_symlink():
+                            if ctx.dry_run:
+                                console.print(f"[blue]Would remove:[/blue] {item}")
+                            else:
+                                item.unlink()
+                            removed_count += 1
+                    if removed_count > 0 and not ctx.dry_run:
+                        ws_name = workspace.path.name
+                        console.print(
+                            f"[yellow]Removed {removed_count} existing symlinks "
+                            f"from {ws_name}[/yellow]"
+                        )
+                    # Clean up empty directories
+                    if not ctx.dry_run:
+                        cleanup_empty_directories(workspace.path, dry_run=False)
+
+        # Re-validate after creating directories
+        warnings = validate_config(config)
+
+        # Check for blocking errors
+        blocking_errors = [w for w in warnings if "conflicts with repo" in w]
+
+        # Check for symlink conflicts
+        plan = create_sync_plan(config)
+
+        if blocking_errors or warnings or plan.symlink_conflicts:
+            console.print(
+                "\n[yellow]Skipping auto-apply due to warnings or conflicts.[/yellow]"
+            )
+            console.print("[yellow]Run 'gro apply' manually after resolving.[/yellow]")
+        elif not plan.has_changes:
+            console.print("\n[green]Nothing to apply - everything is in sync![/green]")
+        else:
+            # Apply the changes
+            if ctx.dry_run:
+                # Show what would be done
+                if plan.symlinks_to_create:
+                    console.print("\n[bold]Would create symlinks:[/bold]")
+                    for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_create:
+                        display = format_symlink_path(ws_name, cat_path, symlink_name)
+                        if symlink_name != repo_name:
+                            display += f" -> {repo_name}"
+                        console.print(f"  [green]+[/green] {display}")
+                console.print("\n[blue]Dry run - no changes made[/blue]")
+            else:
+                results = apply_sync_plan(
+                    config,
+                    plan,
+                    dry_run=False,
+                    remove_orphans=False,
+                )
+                if results["created"]:
+                    console.print(f"\n[green]Created {len(results['created'])} symlinks[/green]")
+                if results["errors"]:
+                    console.print("\n[red]Errors:[/red]")
+                    for error in results["errors"]:
+                        console.print(f"  {error}")
 
 
 @main.command()
@@ -395,10 +511,33 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
 
     config = ctx.config
 
+    # Check for missing workspace directories and prompt to create them
+    for workspace in config.workspaces.values():
+        if not workspace.path.exists():
+            if ctx.dry_run:
+                console.print(f"[blue]Would create:[/blue] {workspace.path}")
+            elif ctx.non_interactive:
+                workspace.path.mkdir(parents=True, exist_ok=True)
+                console.print(f"[green]Created:[/green] {workspace.path}")
+            else:
+                console.print(
+                    f"[yellow]Workspace directory does not exist:[/yellow] {workspace.path}"
+                )
+                if click.confirm("Create it?", default=True):
+                    workspace.path.mkdir(parents=True, exist_ok=True)
+                    console.print(f"[green]Created:[/green] {workspace.path}")
+                else:
+                    console.print("[yellow]Aborted[/yellow]")
+                    return
+
     # Check for config errors that would cause broken symlinks
     all_warnings = validate_config(config)
     blocking_errors = [w for w in all_warnings if "conflicts with repo" in w]
-    non_blocking_warnings = [w for w in all_warnings if "conflicts with repo" not in w]
+    # Filter out workspace "does not exist" warnings since we handled those above
+    non_blocking_warnings = [
+        w for w in all_warnings
+        if "conflicts with repo" not in w and "Workspace directory does not exist" not in w
+    ]
 
     if blocking_errors:
         console.print("[red]Cannot apply - config has errors:[/red]")
@@ -412,7 +551,12 @@ def apply(ctx: Context, prune: bool, workspace_name: str | None) -> None:
         console.print("[yellow]Warnings:[/yellow]")
         for warning in non_blocking_warnings:
             console.print(f"  [yellow]![/yellow] {warning}")
-        if not ctx.non_interactive and not click.confirm("\nContinue?", default=False):
+        # Don't prompt in non-interactive mode or dry-run mode
+        if (
+            not ctx.non_interactive
+            and not ctx.dry_run
+            and not click.confirm("\nContinue?", default=False)
+        ):
             return
         console.print()
 
@@ -631,6 +775,128 @@ def add(ctx: Context, repo_name: str) -> None:
                 if create_symlink(symlink_path, target):
                     display = format_symlink_path(ws_name, cat_path, repo_name)
                     console.print(f"[green]Created symlink:[/green] {display}")
+
+
+def _organize_repos_by_org(
+    config: Config,
+    repos: list[str],
+    include_domain: bool,
+    non_interactive: bool,
+) -> None:
+    """
+    Organize repos by their git remote org.
+
+    Args:
+        config: The configuration to update.
+        repos: List of repo directory names.
+        include_domain: Whether to include domain in category path.
+        non_interactive: Whether to run without prompts.
+    """
+    if not config.workspaces:
+        return
+
+    first_ws = next(iter(config.workspaces.values()))
+    organized_count = 0
+
+    for repo_name in repos:
+        repo_path = config.code_path / repo_name
+        remotes = get_repo_remotes(repo_path)
+
+        if not remotes:
+            # No remotes, add to root category
+            category = first_ws.get_or_create_category(".")
+            category.entries.append(RepoEntry(repo_name=repo_name))
+            organized_count += 1
+            continue
+
+        # Get the remote URL to use
+        if "origin" in remotes:
+            remote_url = remotes["origin"]
+            remote_name = "origin"
+        elif len(remotes) == 1:
+            remote_name = next(iter(remotes.keys()))
+            remote_url = remotes[remote_name]
+        elif not non_interactive:
+            # Multiple remotes, ask user to choose
+            console.print(f"\n[bold]{repo_name}[/bold] has multiple remotes:")
+            remote_names = list(remotes.keys())
+            for i, name in enumerate(remote_names, 1):
+                console.print(f"  {i}. {name}: {remotes[name]}")
+
+            choice = click.prompt("Select remote", default="1")
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(remote_names):
+                    remote_name = remote_names[idx]
+                    remote_url = remotes[remote_name]
+                else:
+                    # Invalid choice, use first remote
+                    remote_name = remote_names[0]
+                    remote_url = remotes[remote_name]
+            except ValueError:
+                remote_name = remote_names[0]
+                remote_url = remotes[remote_name]
+        else:
+            # Non-interactive, use first remote
+            remote_name = next(iter(remotes.keys()))
+            remote_url = remotes[remote_name]
+
+        # Parse the remote URL
+        parsed = parse_git_remote_url(remote_url)
+        if not parsed:
+            # Couldn't parse, add to root category
+            category = first_ws.get_or_create_category(".")
+            category.entries.append(RepoEntry(repo_name=repo_name))
+            organized_count += 1
+            continue
+
+        domain, org, remote_repo_name = parsed
+
+        # Build category path
+        cat_path = f"{domain}/{org}" if include_domain else org
+        category = first_ws.get_or_create_category(cat_path)
+
+        # Get existing symlink names in this category
+        existing_names = category.symlink_names
+
+        # Determine the symlink name to use
+        if repo_name != remote_repo_name:
+            # Would like to use alias (remote repo name)
+            if remote_repo_name not in existing_names:
+                # Alias is available, use it
+                entry = RepoEntry(repo_name=repo_name, alias=remote_repo_name)
+            elif repo_name not in existing_names:
+                # Alias conflicts, fall back to local name
+                entry = RepoEntry(repo_name=repo_name)
+            else:
+                # Both alias and local name conflict - cannot place this repo
+                console.print(
+                    f"[yellow]Warning:[/yellow] Cannot place '{repo_name}' in "
+                    f"'{cat_path}' - symlink name conflicts with existing entry. "
+                    f"Edit config manually to resolve."
+                )
+                continue
+        else:
+            # Local name matches remote name, no alias needed
+            if repo_name not in existing_names:
+                entry = RepoEntry(repo_name=repo_name)
+            else:
+                # Local name conflicts - cannot place this repo
+                console.print(
+                    f"[yellow]Warning:[/yellow] Cannot place '{repo_name}' in "
+                    f"'{cat_path}' - symlink name conflicts with existing entry. "
+                    f"Edit config manually to resolve."
+                )
+                continue
+
+        category.entries.append(entry)
+        organized_count += 1
+
+    # Report results
+    categories = len(first_ws.categories)
+    repo_word = "repo" if organized_count == 1 else "repos"
+    cat_word = "category" if categories == 1 else "categories"
+    console.print(f"Organized {organized_count} {repo_word} into {categories} {cat_word}")
 
 
 def categorize_repo_interactive(

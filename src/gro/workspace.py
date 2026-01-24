@@ -52,6 +52,112 @@ def scan_non_repos(code_path: Path) -> list[str]:
     return sorted(non_repos)
 
 
+def parse_git_remote_url(url: str) -> tuple[str, str, str] | None:
+    """
+    Parse a git remote URL to extract domain, org, and repo name.
+
+    Supports multiple SSH and HTTPS formats:
+    - git@github.com:org/repo.git
+    - user@stash.acme.com:scm/team/repo.git
+    - user@stash.acme.com/scm/team/repo.git
+    - ssh://user@bitbucket.org/team/repo.git
+    - ssh://bitbucket.org/team/repo.git
+    - https://github.com/org/repo.git
+
+    Args:
+        url: The git remote URL.
+
+    Returns:
+        Tuple of (domain, org, repo_name) or None if URL cannot be parsed.
+    """
+    import re
+
+    if not url:
+        return None
+
+    # Remove .git suffix if present
+    url = url.rstrip("/")
+    if url.endswith(".git"):
+        url = url[:-4]
+
+    # SSH format with colon: user@domain:org/repo or user@domain:org/subgroup/repo
+    # Matches git@, jdoe@, F8YEUOV@, etc.
+    ssh_colon_match = re.match(r"^[^@]+@([^:]+):(.+)/([^/]+)$", url)
+    if ssh_colon_match:
+        domain = ssh_colon_match.group(1)
+        org_path = ssh_colon_match.group(2)
+        repo = ssh_colon_match.group(3)
+        return (domain, org_path, repo)
+
+    # SSH format with slash: user@domain/org/repo (no colon separator)
+    # Matches jdoe@stash.acme.com/scm/team/repo
+    ssh_slash_match = re.match(r"^[^@]+@([^/]+)/(.+)/([^/]+)$", url)
+    if ssh_slash_match:
+        domain = ssh_slash_match.group(1)
+        org_path = ssh_slash_match.group(2)
+        repo = ssh_slash_match.group(3)
+        return (domain, org_path, repo)
+
+    # SSH protocol format: ssh://user@domain/org/repo or ssh://domain/org/repo
+    ssh_protocol_match = re.match(r"^ssh://(?:[^@]+@)?([^/]+)/(.+)/([^/]+)$", url)
+    if ssh_protocol_match:
+        domain = ssh_protocol_match.group(1)
+        org_path = ssh_protocol_match.group(2)
+        repo = ssh_protocol_match.group(3)
+        return (domain, org_path, repo)
+
+    # HTTPS format: https://domain/org/repo or https://domain/org/subgroup/repo
+    https_match = re.match(r"^https?://([^/]+)/(.+)/([^/]+)$", url)
+    if https_match:
+        domain = https_match.group(1)
+        org_path = https_match.group(2)
+        repo = https_match.group(3)
+        return (domain, org_path, repo)
+
+    return None
+
+
+def get_repo_remotes(repo_path: Path) -> dict[str, str]:
+    """
+    Get all remotes for a git repository.
+
+    Args:
+        repo_path: Path to the git repository.
+
+    Returns:
+        Dict mapping remote names to URLs.
+    """
+    import subprocess
+
+    if not (repo_path / ".git").exists():
+        return {}
+
+    try:
+        result = subprocess.run(
+            ["git", "remote", "-v"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return {}
+
+        remotes: dict[str, str] = {}
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            # Format: "origin\tgit@github.com:user/repo.git (fetch)"
+            parts = line.split()
+            if len(parts) >= 2 and "(fetch)" in line:
+                remote_name = parts[0]
+                remote_url = parts[1]
+                remotes[remote_name] = remote_url
+
+        return remotes
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return {}
+
+
 def scan_workspace_symlinks(workspace_path: Path) -> dict[str, list[str]]:
     """
     Scan a workspace directory for symlinks.

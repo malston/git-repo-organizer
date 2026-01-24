@@ -92,8 +92,29 @@ Initialize configuration with code and workspace directories.
 
 ```bash
 gro init --code ~/code --workspace ~/workspace
-gro init --scan  # Also scan and categorize existing repos
+gro init --scan                    # Scan and categorize existing repos interactively
+gro --non-interactive init --scan --by-org  # Auto-organize by git remote org
+gro --non-interactive init --scan --by-org --include-domain  # Include domain in path
+gro --non-interactive init --scan --auto-apply  # Auto-apply symlinks after init
 ```
+
+The `--by-org` flag parses each repo's git remote to extract the org/owner and creates categories automatically. Use `--include-domain` for multi-host setups (e.g., GitHub + GitHub Enterprise).
+
+The `--auto-apply` flag automatically creates symlinks after init, but only if there are no warnings or conflicts. If issues are detected, it skips apply and prompts you to run `gro apply` manually after resolving them.
+
+**Example: Create a new workspace with auto-organization**
+
+```bash
+# Create a new config organized by org with domain paths and auto-apply symlinks
+gro -c ~/.config/gro/config-by-org.yaml --non-interactive init --scan --by-org --include-domain --workspace ~/git --auto-apply
+
+# Or without auto-apply, do it in steps:
+gro -c ~/.config/gro/config-by-org.yaml init --scan --by-org --include-domain --workspace ~/git
+gro -c ~/.config/gro/config-by-org.yaml -n apply  # Preview
+gro -c ~/.config/gro/config-by-org.yaml apply     # Apply
+```
+
+This creates categories like `github.com/malston`, `github.enterprise.com/team`, etc.
 
 ### `gro status`
 
@@ -150,6 +171,28 @@ gro find --path vcf   # Output only path (useful for cd)
 
 # Change to a repo directory
 cd "$(gro find --path)"
+```
+
+**Shell function for quick navigation:**
+
+Add this to your `~/.bashrc` or `~/.zshrc` to create a `gcd` command that jumps to repositories:
+
+```bash
+# Jump to a git repo managed by gro
+gcd() {
+  local dir
+  dir=$(gro find --path "$@")
+  if [[ -n "$dir" ]]; then
+    cd "$dir"
+  fi
+}
+```
+
+Then use it like:
+
+```bash
+gcd             # Interactive selection, then cd to chosen repo
+gcd vcf         # Filter by pattern, then cd to chosen repo
 ```
 
 ### `gro fmt`

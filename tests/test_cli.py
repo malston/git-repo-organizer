@@ -63,6 +63,47 @@ class TestMain:
         assert result.exit_code == 0
         assert "Would save config" in result.output
 
+    def test_config_from_env_var(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Config path can be set via GRO_CONFIG environment variable."""
+        result = runner.invoke(
+            main,
+            [
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+            ],
+            env={"GRO_CONFIG": str(test_env["config"])},
+        )
+        assert result.exit_code == 0
+        assert test_env["config"].exists()
+
+    def test_config_flag_overrides_env_var(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--config flag takes precedence over GRO_CONFIG env var."""
+        env_config = test_env["config"].parent / "env-config.yaml"
+        flag_config = test_env["config"]
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(flag_config),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+            ],
+            env={"GRO_CONFIG": str(env_config)},
+        )
+        assert result.exit_code == 0
+        # Flag config should be used, not env var config
+        assert flag_config.exists()
+        assert not env_config.exists()
+
 
 class TestInit:
     """Tests for init command."""
@@ -154,6 +195,45 @@ class TestInit:
         config = load_config(test_env["config"])
         assert "my-repo" in config.all_repos()
 
+    def test_by_org_requires_scan(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """--by-org requires --scan flag."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "--by-org requires --scan" in result.output
+
+    def test_include_domain_requires_by_org(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--include-domain requires --by-org flag."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--include-domain",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "--include-domain requires --by-org" in result.output
+
     def test_warns_on_missing_dirs(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
         """Shows warnings for missing directories."""
         result = runner.invoke(
@@ -170,6 +250,519 @@ class TestInit:
         )
         assert result.exit_code == 0
         assert "Warning:" in result.output
+
+    def test_scan_by_org_organizes_repos(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Scan with --by-org organizes repos by git remote org."""
+        import subprocess
+
+        # Create repos with different orgs
+        repo1 = test_env["code"] / "homelab"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:malston/homelab.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        repo2 = test_env["code"] / "other-project"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:claudup/other-project.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Repos should be organized by org
+        assert "malston" in ws.categories
+        assert "claudup" in ws.categories
+        assert "homelab" in ws.categories["malston"].repo_names
+        assert "other-project" in ws.categories["claudup"].repo_names
+
+    def test_scan_by_org_with_domain(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Scan with --by-org --include-domain includes domain in category."""
+        import subprocess
+
+        # Create repos from different domains
+        repo1 = test_env["code"] / "public-repo"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:malston/public-repo.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        repo2 = test_env["code"] / "internal-repo"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            [
+                "git", "remote", "add", "origin",
+                "git@github.acme.com:acme/internal-repo.git",
+            ],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+                "--include-domain",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Categories should include domain
+        assert "github.com/malston" in ws.categories
+        assert "github.acme.com/acme" in ws.categories
+        assert "public-repo" in ws.categories["github.com/malston"].repo_names
+        assert "internal-repo" in ws.categories["github.acme.com/acme"].repo_names
+
+    def test_scan_by_org_no_remote_goes_to_root(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Repos without remotes go to root category when using --by-org."""
+        import subprocess
+
+        # Create a repo without a remote
+        repo = test_env["code"] / "local-only"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Repo should be in root category
+        assert "." in ws.categories
+        assert "local-only" in ws.categories["."].repo_names
+
+    def test_scan_by_org_creates_alias_when_dir_differs(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Creates alias when local dir name differs from remote repo name."""
+        import subprocess
+
+        # Create repo with different local name than remote
+        repo = test_env["code"] / "my-dotfiles"  # Local name
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True)
+        subprocess.run(
+            # Remote name is "dotfiles"
+            ["git", "remote", "add", "origin", "git@github.com:malston/dotfiles.git"],
+            cwd=repo,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Should have entry with alias
+        assert "malston" in ws.categories
+        entries = ws.categories["malston"].entries
+        assert len(entries) == 1
+        assert entries[0].repo_name == "my-dotfiles"  # Local dir name
+        assert entries[0].alias == "dotfiles"  # Remote repo name
+
+    def test_scan_by_org_skips_alias_on_conflict(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Skips alias when it would conflict with existing symlink name."""
+        import subprocess
+
+        # Create two repos that both have remote name "amplifier"
+        repo1 = test_env["code"] / "amplifier-claude"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        repo2 = test_env["code"] / "amplifier-preflight"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:microsoft/amplifier.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+
+        # Should have both entries without conflict
+        assert "microsoft" in ws.categories
+        entries = ws.categories["microsoft"].entries
+        assert len(entries) == 2
+
+        # First one gets the alias, second uses local name
+        symlink_names = {e.symlink_name for e in entries}
+        assert "amplifier" in symlink_names  # One gets the alias
+        # The other should use its local name (no duplicate "amplifier")
+        assert len(symlink_names) == 2  # Two unique names
+
+    def test_scan_by_org_falls_back_to_local_name_when_alias_conflicts(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Falls back to local dir name when preferred alias is already taken."""
+        import subprocess
+
+        # Create repo "amplifier" - local name matches remote name, gets symlink "amplifier"
+        repo1 = test_env["code"] / "amplifier"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:acme/amplifier.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        # Create repo "amplifier-fork" - would prefer alias "amplifier" but it's taken,
+        # so falls back to local name "amplifier-fork"
+        repo2 = test_env["code"] / "amplifier-fork"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:acme/amplifier.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        # Both repos should be placed
+        config = load_config(test_env["config"])
+        ws = config.workspaces["workspace"]
+        entries = ws.categories["acme"].entries
+        symlink_names = {e.symlink_name for e in entries}
+
+        # amplifier (from repo1, no alias needed) and amplifier-fork (local name fallback)
+        assert "amplifier" in symlink_names
+        assert "amplifier-fork" in symlink_names
+
+    def test_scan_by_org_reports_correct_organized_count(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Reports correct organized count when repos are skipped due to conflicts."""
+        import subprocess
+
+        # Create repo "aaa-bar-fork" with remote "bar" - processed first alphabetically
+        # Takes symlink alias "bar"
+        repo1 = test_env["code"] / "aaa-bar-fork"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:acme/bar.git"],
+            cwd=repo1,
+            capture_output=True,
+        )
+
+        # Create repo "bar" with remote "bar" - processed second
+        # This creates an unresolvable conflict because:
+        # - The symlink name "bar" is already taken by repo1's alias
+        # - Local name "bar" would also use "bar" (same as remote name)
+        repo2 = test_env["code"] / "bar"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:acme/bar.git"],
+            cwd=repo2,
+            capture_output=True,
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--by-org",
+            ],
+        )
+        assert result.exit_code == 0
+
+        # Should report 1 organized (not 2) since one repo was skipped
+        assert "Organized 1 repo" in result.output
+        # Should warn about the skipped repo
+        assert "Cannot place 'bar'" in result.output
+
+    def test_auto_apply_creates_symlinks(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply creates symlinks after init when no errors or warnings."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Created 1 symlinks" in result.output
+
+        # Symlink should exist
+        symlink = test_env["workspace"] / "my-repo"
+        assert symlink.is_symlink()
+
+    def test_overwrite_skips_prompt_and_cleans_workspace(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--overwrite skips config prompt and removes existing symlinks."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create existing config
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="old-repo")])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # Create existing symlink that should be removed
+        old_symlink = test_env["workspace"] / "old-repo"
+        old_symlink.symlink_to(test_env["code"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--overwrite",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should not prompt for overwrite
+        assert "Overwrite?" not in result.output
+        # Old symlink should be removed
+        assert not old_symlink.exists()
+        # New symlink should be created
+        assert (test_env["workspace"] / "my-repo").is_symlink()
+
+    def test_auto_apply_creates_workspace_dir(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply creates workspace directory if it doesn't exist."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        # Use non-existent workspace
+        nonexistent_ws = test_env["workspace"].parent / "new-workspace"
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(nonexistent_ws),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        # Workspace should be created
+        assert nonexistent_ws.exists()
+        # Symlink should be created
+        assert (nonexistent_ws / "my-repo").is_symlink()
+        assert "Created 1 symlinks" in result.output
+
+    def test_auto_apply_skips_on_conflicts(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply skips apply when there are symlink conflicts."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create a directory where symlink should be (conflict)
+        conflict_dir = test_env["workspace"] / "my-repo"
+        conflict_dir.mkdir(parents=True)
+        (conflict_dir / "some-file.txt").touch()  # Make it non-empty
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Skipping auto-apply" in result.output
+        # Should NOT contain "Created" since apply was skipped
+        assert "Created" not in result.output
+
+    def test_auto_apply_respects_dry_run(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--auto-apply respects --dry-run flag."""
+        # Create a repo
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "--dry-run",
+                "init",
+                "--code",
+                str(test_env["code"]),
+                "--workspace",
+                str(test_env["workspace"]),
+                "--scan",
+                "--auto-apply",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Dry run - no changes made" in result.output
+
+        # Config and symlink should NOT exist
+        assert not test_env["config"].exists()
+        symlink = test_env["workspace"] / "my-repo"
+        assert not symlink.exists()
 
 
 class TestStatus:
@@ -607,14 +1200,13 @@ class TestApply:
         self, runner: CliRunner, test_env: dict[str, Path]
     ) -> None:
         """Proceeds when user confirms despite warnings."""
-        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
-        # Use non-existent workspace to trigger warning
-        nonexistent_ws = test_env["workspace"].parent / "nonexistent-ws"
+        # Use non-existent code directory to trigger warning
+        nonexistent_code = test_env["code"].parent / "nonexistent-code"
 
-        config = Config(code_path=test_env["code"])
-        ws = Workspace(path=nonexistent_ws)
+        config = Config(code_path=nonexistent_code)
+        ws = Workspace(path=test_env["workspace"])
         ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
-        config.workspaces["nonexistent-ws"] = ws
+        config.workspaces["workspace"] = ws
         save_config(config, test_env["config"])
 
         # User confirms to continue
@@ -651,6 +1243,83 @@ class TestApply:
         )
         assert "Warning" in result.output
         assert "Continue?" not in result.output
+
+    def test_skips_prompt_in_dry_run(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Skips warning prompt in dry-run mode."""
+        nonexistent_code = test_env["code"].parent / "nonexistent"
+
+        config = Config(code_path=nonexistent_code)
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--dry-run",
+                "apply",
+            ],
+        )
+        assert "Warning" in result.output
+        assert "Continue?" not in result.output
+
+    def test_prompts_to_create_workspace_dir(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Prompts user to create workspace directory if it doesn't exist."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+        nonexistent_ws = test_env["workspace"].parent / "new-workspace"
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=nonexistent_ws)
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        config.workspaces["new-workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # User confirms to create directory
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+            input="y\n",
+        )
+        assert result.exit_code == 0
+        assert "Create it?" in result.output
+        assert nonexistent_ws.exists()
+        assert (nonexistent_ws / "my-repo").is_symlink()
+
+    def test_skips_apply_if_user_declines_workspace_creation(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Skips apply if user declines to create workspace directory."""
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+        nonexistent_ws = test_env["workspace"].parent / "new-workspace"
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=nonexistent_ws)
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        config.workspaces["new-workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # User declines to create directory
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "apply",
+            ],
+            input="n\n",
+        )
+        assert result.exit_code == 0
+        assert "Create it?" in result.output
+        assert not nonexistent_ws.exists()
 
 
 class TestSync:
