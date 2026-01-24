@@ -978,3 +978,86 @@ class TestFind:
         assert result.exit_code == 0
         # Should output only the path, no extra formatting
         assert result.output.strip() == str(test_env["workspace"] / "my-repo")
+
+    def test_list_mode_without_pattern_shows_all(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """List mode without pattern shows all repos."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["repo-a", "repo-b"])
+        ws.categories["nested"] = Category(path="nested", repos=["repo-c"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--list",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "repo-a" in result.output
+        assert "repo-b" in result.output
+        assert "repo-c" in result.output
+
+    def test_nested_category_paths_correct(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Nested category paths are displayed and resolved correctly."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["vmware/cloud-foundry"] = Category(
+            path="vmware/cloud-foundry", repos=["tas-vcf"]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--list",
+                "tas",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "tas-vcf" in result.output
+        assert "workspace/vmware/cloud-foundry/tas-vcf" in result.output
+        # Full path should include the nested structure (check parts due to line wrapping)
+        assert "vmware/cloud-foundry/tas-vcf" in result.output
+
+    def test_cancelled_selection_in_path_mode(
+        self, runner: CliRunner, test_env: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Cancelled selection in path mode exits with code 1."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # Mock the fuzzy selector to return None (cancelled)
+        def mock_fuzzy(*args, **kwargs):
+            class MockPrompt:
+                def execute(self):
+                    return None
+            return MockPrompt()
+
+        monkeypatch.setattr("gro.cli.inquirer.fuzzy", mock_fuzzy)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "find",
+                "--path",
+            ],
+        )
+        assert result.exit_code == 1

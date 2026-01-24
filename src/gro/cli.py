@@ -4,12 +4,22 @@
 
 from __future__ import annotations
 
-import shutil
+import sys
+from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING, Generator
+import shutil
 
 import click
 from InquirerPy import inquirer
+from prompt_toolkit.application import create_app_session
+from prompt_toolkit.input import create_input
+from prompt_toolkit.output import create_output
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from prompt_toolkit.input import Input
+    from prompt_toolkit.output import Output
 
 from gro.config import (
     create_default_config,
@@ -28,6 +38,21 @@ from gro.workspace import (
 )
 
 console = Console()
+
+
+@contextmanager
+def _stderr_output() -> Generator[None, None, None]:
+    """Redirect prompt_toolkit output to stderr for --path mode."""
+    inp = create_input()
+    out = create_output(stdout=sys.stderr)
+    with create_app_session(input=inp, output=out):
+        yield
+
+
+@contextmanager
+def _noop_context() -> Generator[None, None, None]:
+    """No-op context manager for when no redirection is needed."""
+    yield
 
 
 def format_symlink_path(ws_name: str, cat_path: str, repo_name: str) -> str:
@@ -743,32 +768,9 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
 
     # Interactive fuzzy selection
     # For --path mode, render TUI to stderr so stdout is clean for cd
-    import sys
-    from contextlib import contextmanager
-
-    @contextmanager
-    def stderr_output():
-        """Redirect prompt_toolkit output to stderr for --path mode."""
-        from prompt_toolkit.application import create_app_session
-        from prompt_toolkit.input import create_input
-        from prompt_toolkit.output import create_output
-
-        inp = create_input()
-        out = create_output(stdout=sys.stderr)
-        with create_app_session(input=inp, output=out):
-            yield
-
     try:
-        if path_mode:
-            with stderr_output():
-                result = inquirer.fuzzy(
-                    message="Find repo:",
-                    choices=choices,
-                    default=pattern or "",
-                    match_exact=False,
-                    border=True,
-                ).execute()
-        else:
+        ctx_manager = _stderr_output() if path_mode else _noop_context()
+        with ctx_manager:
             result = inquirer.fuzzy(
                 message="Find repo:",
                 choices=choices,
