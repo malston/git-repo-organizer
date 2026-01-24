@@ -5,7 +5,7 @@
 from pathlib import Path
 
 from gro.config import create_default_config
-from gro.models import Category, Config, Workspace
+from gro.models import Category, Config, RepoEntry, Workspace
 from gro.workspace import (
     apply_sync_plan,
     check_symlink_status,
@@ -17,6 +17,7 @@ from gro.workspace import (
     get_symlink_target,
     remove_symlink,
     scan_code_dir,
+    scan_non_repos,
     scan_workspace_symlinks,
     update_symlink,
 )
@@ -61,6 +62,62 @@ class TestScanCodeDir:
 
         repos = scan_code_dir(code_path)
         assert repos == ["repo"]
+
+
+class TestScanNonRepos:
+    """Tests for scan_non_repos function."""
+
+    def test_empty_dir(self, tmp_path: Path) -> None:
+        """Empty directory returns empty list."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        assert scan_non_repos(code_path) == []
+
+    def test_nonexistent_dir(self, tmp_path: Path) -> None:
+        """Nonexistent directory returns empty list."""
+        code_path = tmp_path / "nonexistent"
+        assert scan_non_repos(code_path) == []
+
+    def test_finds_non_git_dirs(self, tmp_path: Path) -> None:
+        """Finds directories that don't contain .git."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        # Create git repos (should be ignored)
+        (code_path / "repo-a" / ".git").mkdir(parents=True)
+        (code_path / "repo-b" / ".git").mkdir(parents=True)
+
+        # Create non-git directories (should be found)
+        (code_path / "not-a-repo").mkdir()
+        (code_path / "another-dir").mkdir()
+
+        non_repos = scan_non_repos(code_path)
+        assert non_repos == ["another-dir", "not-a-repo"]
+
+    def test_ignores_files(self, tmp_path: Path) -> None:
+        """Ignores files in code directory."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        (code_path / "not-a-repo").mkdir()
+        (code_path / "somefile.txt").touch()
+
+        non_repos = scan_non_repos(code_path)
+        assert non_repos == ["not-a-repo"]
+
+    def test_ignores_symlinks(self, tmp_path: Path) -> None:
+        """Ignores symlinks in code directory."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        target = tmp_path / "target"
+        target.mkdir()
+
+        (code_path / "not-a-repo").mkdir()
+        (code_path / "symlink-dir").symlink_to(target)
+
+        non_repos = scan_non_repos(code_path)
+        assert non_repos == ["not-a-repo"]
 
 
 class TestScanWorkspaceSymlinks:
@@ -303,7 +360,7 @@ class TestGetRepoStatus:
 
         config = Config(code_path=code_path)
         ws = Workspace(path=workspace_path)
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
         config.workspaces["workspace"] = ws
 
         status = get_repo_status(config, "my-repo")
@@ -319,7 +376,7 @@ class TestGetRepoStatus:
 
         config = Config(code_path=code_path)
         ws = Workspace(path=tmp_path / "workspace")
-        ws.categories["."] = Category(path=".", repos=["missing-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="missing-repo")])
         config.workspaces["workspace"] = ws
 
         status = get_repo_status(config, "missing-repo")
@@ -375,7 +432,7 @@ class TestCreateSyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", repos=["missing-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="missing-repo")])
 
         plan = create_sync_plan(config)
         assert "missing-repo" in plan.repos_missing
@@ -394,10 +451,11 @@ class TestCreateSyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
 
         plan = create_sync_plan(config)
-        assert ("workspace", ".", "my-repo") in plan.symlinks_to_create
+        # 4-tuple: (workspace, category, repo_name, symlink_name)
+        assert ("workspace", ".", "my-repo", "my-repo") in plan.symlinks_to_create
 
     def test_orphaned_symlinks_to_remove(self, tmp_path: Path) -> None:
         """Detects symlinks not in config."""
@@ -434,7 +492,7 @@ class TestApplySyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
 
         plan = create_sync_plan(config)
         results = apply_sync_plan(config, plan)
@@ -477,7 +535,7 @@ class TestApplySyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
 
         plan = create_sync_plan(config)
         results = apply_sync_plan(config, plan, dry_run=True)
@@ -528,3 +586,126 @@ class TestCleanupEmptyDirectories:
         removed = cleanup_empty_directories(workspace_path, dry_run=True)
         assert len(removed) == 1
         assert (workspace_path / "empty").exists()
+
+
+class TestAliasedSymlinks:
+    """Tests for aliased symlink functionality."""
+
+    def test_sync_plan_uses_symlink_name(self, tmp_path: Path) -> None:
+        """Sync plan uses alias as symlink name."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "acme-git" / ".git").mkdir(parents=True)
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+
+        config = create_default_config(
+            code_path=code_path,
+            workspace_paths=[workspace_path],
+        )
+        ws = config.workspaces["workspace"]
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="acme-git", alias="git")],
+        )
+
+        plan = create_sync_plan(config)
+
+        # Should create symlink named "git" (the alias)
+        assert len(plan.symlinks_to_create) == 1
+        ws_name, cat_path, repo_name, symlink_name = plan.symlinks_to_create[0]
+        assert ws_name == "workspace"
+        assert repo_name == "acme-git"
+        assert symlink_name == "git"
+
+    def test_apply_creates_aliased_symlink(self, tmp_path: Path) -> None:
+        """Apply creates symlink with alias name pointing to actual repo."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "acme-git" / ".git").mkdir(parents=True)
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+
+        config = create_default_config(
+            code_path=code_path,
+            workspace_paths=[workspace_path],
+        )
+        ws = config.workspaces["workspace"]
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="acme-git", alias="git")],
+        )
+
+        plan = create_sync_plan(config)
+        apply_sync_plan(config, plan)
+
+        # Symlink should be named "git"
+        symlink = workspace_path / "git"
+        assert symlink.is_symlink()
+        # But should point to acme-git repo
+        assert symlink.resolve() == code_path / "acme-git"
+
+    def test_orphan_detection_uses_symlink_name(self, tmp_path: Path) -> None:
+        """Orphan detection checks symlink name, not repo name."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        # Create a symlink named "git" (the alias)
+        (workspace_path / "git").symlink_to(code_path)
+
+        config = create_default_config(
+            code_path=code_path,
+            workspace_paths=[workspace_path],
+        )
+        ws = config.workspaces["workspace"]
+        # Config has acme-git:git, so "git" symlink should NOT be orphaned
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="acme-git", alias="git")],
+        )
+
+        plan = create_sync_plan(config)
+
+        # "git" symlink matches the alias, so not orphaned
+        assert ("workspace", ".", "git") not in plan.symlinks_to_remove
+
+    def test_mixed_aliased_and_non_aliased(self, tmp_path: Path) -> None:
+        """Mix of aliased and non-aliased repos work together."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "config-lab" / ".git").mkdir(parents=True)
+        (code_path / "acme-git" / ".git").mkdir(parents=True)
+        (code_path / "acme-stuff" / ".git").mkdir(parents=True)
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+
+        config = create_default_config(
+            code_path=code_path,
+            workspace_paths=[workspace_path],
+        )
+        ws = config.workspaces["workspace"]
+        ws.categories["vendor/projects"] = Category(
+            path="vendor/projects",
+            entries=[
+                RepoEntry(repo_name="config-lab"),  # No alias
+                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-stuff", alias="stuff"),
+            ],
+        )
+
+        plan = create_sync_plan(config)
+        apply_sync_plan(config, plan)
+
+        # Check symlinks
+        base = workspace_path / "vendor" / "projects"
+        assert (base / "config-lab").is_symlink()
+        assert (base / "config-lab").resolve() == code_path / "config-lab"
+        assert (base / "git").is_symlink()
+        assert (base / "git").resolve() == code_path / "acme-git"
+        assert (base / "stuff").is_symlink()
+        assert (base / "stuff").resolve() == code_path / "acme-stuff"

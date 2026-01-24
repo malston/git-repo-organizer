@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from gro.models import Category, Config, Workspace
 from gro.config import (
     ConfigError,
     create_default_config,
@@ -17,6 +16,7 @@ from gro.config import (
     serialize_config,
     validate_config,
 )
+from gro.models import Category, Config, RepoEntry, Workspace
 
 
 class TestExpandPath:
@@ -62,7 +62,7 @@ class TestParseConfig:
         ws = config.workspaces["workspace"]
         assert "." in ws.categories
         assert "vmware" in ws.categories
-        assert "foo" in ws.categories["."].repos
+        assert "foo" in ws.categories["."].repo_names
 
     def test_missing_code_raises(self) -> None:
         """Missing code field raises ConfigError."""
@@ -98,6 +98,53 @@ class TestParseConfig:
         with pytest.raises(ConfigError, match="must be a list"):
             parse_config(data)
 
+    def test_parses_aliased_repos(self) -> None:
+        """Parses repo entries with aliases."""
+        data = {
+            "code": "~/code",
+            "workspaces": ["~/workspace"],
+            "workspace": {
+                "vendor/projects": [
+                    "config-lab",
+                    "acme-git:git",
+                    "acme-stuff:stuff",
+                ]
+            },
+        }
+        config = parse_config(data)
+        ws = config.workspaces["workspace"]
+        cat = ws.categories["vendor/projects"]
+
+        assert len(cat.entries) == 3
+        # First entry: no alias
+        assert cat.entries[0].repo_name == "config-lab"
+        assert cat.entries[0].alias is None
+        # Second entry: with alias
+        assert cat.entries[1].repo_name == "acme-git"
+        assert cat.entries[1].alias == "git"
+        # Third entry: with alias
+        assert cat.entries[2].repo_name == "acme-stuff"
+        assert cat.entries[2].alias == "stuff"
+
+    def test_repo_names_and_symlink_names(self) -> None:
+        """After parsing, repo_names and symlink_names are correct."""
+        data = {
+            "code": "~/code",
+            "workspaces": ["~/workspace"],
+            "workspace": {
+                ".": [
+                    "acme-git:git",
+                    "config-lab",
+                ]
+            },
+        }
+        config = parse_config(data)
+        ws = config.workspaces["workspace"]
+        cat = ws.categories["."]
+
+        assert cat.repo_names == {"acme-git", "config-lab"}
+        assert cat.symlink_names == {"git", "config-lab"}
+
 
 class TestSerializeConfig:
     """Tests for serialize_config function."""
@@ -105,9 +152,10 @@ class TestSerializeConfig:
     def test_roundtrip(self) -> None:
         """Config survives serialize/parse roundtrip."""
         original = create_default_config()
-        original.workspaces["workspace"].categories["."] = __import__(
-            "gro.models", fromlist=["Category"]
-        ).Category(path=".", repos=["foo", "bar"])
+        original.workspaces["workspace"].categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="foo"), RepoEntry(repo_name="bar")],
+        )
 
         data = serialize_config(original)
         restored = parse_config(data)
@@ -120,6 +168,47 @@ class TestSerializeConfig:
         config = create_default_config()
         data = serialize_config(config)
         assert data["code"].startswith("~/")
+
+    def test_serializes_aliased_repos(self) -> None:
+        """Serializes repo entries with aliases correctly."""
+        config = create_default_config()
+        ws = config.workspaces["workspace"]
+        ws.categories["vendor/projects"] = Category(
+            path="vendor/projects",
+            entries=[
+                RepoEntry(repo_name="config-lab"),
+                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-stuff", alias="stuff"),
+            ],
+        )
+
+        data = serialize_config(config)
+        repos = data["workspace"]["vendor/projects"]
+
+        assert "config-lab" in repos
+        assert "acme-git:git" in repos
+        assert "acme-stuff:stuff" in repos
+
+    def test_roundtrip_with_aliases(self) -> None:
+        """Config with aliases survives serialize/parse roundtrip."""
+        original = create_default_config()
+        ws = original.workspaces["workspace"]
+        ws.categories["."] = Category(
+            path=".",
+            entries=[
+                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="config-lab"),
+            ],
+        )
+
+        data = serialize_config(original)
+        restored = parse_config(data)
+
+        ws_restored = restored.workspaces["workspace"]
+        cat = ws_restored.categories["."]
+
+        assert cat.repo_names == {"acme-git", "config-lab"}
+        assert cat.symlink_names == {"git", "config-lab"}
 
 
 class TestLoadSaveConfig:
@@ -197,13 +286,59 @@ class TestValidateConfig:
 
         config = Config(code_path=code_path)
         ws = Workspace(path=ws_path)
-        # Add repo "wellsfargo-stuff" to root category
-        ws.categories["."] = Category(path=".", repos=["wellsfargo-stuff"])
-        # Add category "wellsfargo-stuff/git" which conflicts
-        ws.categories["wellsfargo-stuff/git"] = Category(
-            path="wellsfargo-stuff/git", repos=["config-lab"]
+        # Add repo "acme-stuff" to root category
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="acme-stuff")]
+        )
+        # Add category "acme-stuff/git" which conflicts
+        ws.categories["acme-stuff/git"] = Category(
+            path="acme-stuff/git", entries=[RepoEntry(repo_name="config-lab")]
         )
         config.workspaces["workspace"] = ws
 
         warnings = validate_config(config)
         assert any("conflicts with repo" in w for w in warnings)
+
+    def test_warns_on_duplicate_symlink_names(self, tmp_path: Path) -> None:
+        """Warns if two entries have the same symlink name in same category."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        ws_path = tmp_path / "workspace"
+        ws_path.mkdir()
+
+        config = Config(code_path=code_path)
+        ws = Workspace(path=ws_path)
+        # Two different repos with same alias "git"
+        ws.categories["."] = Category(
+            path=".",
+            entries=[
+                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="other-git", alias="git"),
+            ],
+        )
+        config.workspaces["workspace"] = ws
+
+        warnings = validate_config(config)
+        assert any("duplicate symlink name" in w.lower() for w in warnings)
+
+    def test_warns_on_symlink_name_conflicts_with_repo(self, tmp_path: Path) -> None:
+        """Warns if alias conflicts with another repo's symlink name."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        ws_path = tmp_path / "workspace"
+        ws_path.mkdir()
+
+        config = Config(code_path=code_path)
+        ws = Workspace(path=ws_path)
+        # Repo "git" and another repo aliased to "git"
+        ws.categories["."] = Category(
+            path=".",
+            entries=[
+                RepoEntry(repo_name="git"),  # symlink_name = "git"
+                RepoEntry(repo_name="acme-git", alias="git"),  # symlink_name = "git"
+            ],
+        )
+        config.workspaces["workspace"] = ws
+
+        warnings = validate_config(config)
+        assert any("duplicate symlink name" in w.lower() for w in warnings)

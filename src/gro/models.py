@@ -9,16 +9,54 @@ from pathlib import Path
 
 
 @dataclass
+class RepoEntry:
+    """A repository entry with optional alias for symlink name."""
+
+    repo_name: str
+    alias: str | None = None
+
+    @property
+    def symlink_name(self) -> str:
+        """Get the name to use for the symlink (alias if set, else repo_name)."""
+        return self.alias if self.alias else self.repo_name
+
+    @classmethod
+    def from_string(cls, s: str) -> RepoEntry:
+        """Parse a string into a RepoEntry.
+
+        Format: "repo_name" or "repo_name:alias"
+        """
+        if ":" in s:
+            repo_name, alias = s.split(":", 1)
+            return cls(repo_name=repo_name, alias=alias)
+        return cls(repo_name=s)
+
+    def to_string(self) -> str:
+        """Serialize to string format."""
+        return f"{self.repo_name}:{self.alias}" if self.alias else self.repo_name
+
+
+@dataclass
 class Category:
     """A category within a workspace containing repo symlinks."""
 
     path: str  # e.g., "vmware/vsphere" or "." for root
-    repos: list[str] = field(default_factory=list)
+    entries: list[RepoEntry] = field(default_factory=list)
 
     @property
     def is_root(self) -> bool:
         """Check if this is the root category (symlinks directly to workspace)."""
         return self.path == "."
+
+    @property
+    def repo_names(self) -> set[str]:
+        """Get set of actual repo names (not aliases)."""
+        return {entry.repo_name for entry in self.entries}
+
+    @property
+    def symlink_names(self) -> set[str]:
+        """Get set of symlink names (alias if set, else repo name)."""
+        return {entry.symlink_name for entry in self.entries}
 
 
 @dataclass
@@ -47,7 +85,7 @@ class Workspace:
         """Get all repo names across all categories."""
         repos: set[str] = set()
         for category in self.categories.values():
-            repos.update(category.repos)
+            repos.update(category.repo_names)
         return repos
 
     def find_repo_categories(self, repo_name: str) -> list[str]:
@@ -55,7 +93,7 @@ class Workspace:
         return [
             cat_path
             for cat_path, category in self.categories.items()
-            if repo_name in category.repos
+            if repo_name in category.repo_names
         ]
 
 
@@ -120,15 +158,16 @@ class SyncPlan:
 
     repos_to_add: list[str]  # In code but not in config
     repos_missing: list[str]  # In config but not in code
-    symlinks_to_create: list[tuple[str, str, str]]  # (workspace, category, repo)
-    symlinks_to_update: list[tuple[str, str, str]]  # (workspace, category, repo)
-    symlinks_to_remove: list[tuple[str, str, str]]  # (workspace, category, repo)
+    # (workspace, category, repo_name, symlink_name)
+    symlinks_to_create: list[tuple[str, str, str, str]]
+    symlinks_to_update: list[tuple[str, str, str, str]]
+    symlinks_to_remove: list[tuple[str, str, str]]  # (workspace, category, symlink_name)
     non_symlink_dirs: list[tuple[str, str, str]] = field(
         default_factory=list
     )  # (workspace, category, dir_name)
-    symlink_conflicts: list[tuple[str, str, str]] = field(
+    symlink_conflicts: list[tuple[str, str, str, str]] = field(
         default_factory=list
-    )  # (workspace, category, repo) - directory exists where symlink should be
+    )  # (workspace, category, repo_name, symlink_name) - dir exists where symlink should be
 
     @property
     def has_changes(self) -> bool:

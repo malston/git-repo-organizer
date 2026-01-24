@@ -31,6 +31,27 @@ def scan_code_dir(code_path: Path) -> list[str]:
     return sorted(repos)
 
 
+def scan_non_repos(code_path: Path) -> list[str]:
+    """
+    Scan the code directory for directories that are not git repositories.
+
+    Args:
+        code_path: Path to the code directory.
+
+    Returns:
+        List of directory names that do not contain .git.
+    """
+    if not code_path.exists():
+        return []
+
+    non_repos: list[str] = []
+    for item in code_path.iterdir():
+        if item.is_dir() and not item.is_symlink() and not (item / ".git").exists():
+            non_repos.append(item.name)
+
+    return sorted(non_repos)
+
+
 def scan_workspace_symlinks(workspace_path: Path) -> dict[str, list[str]]:
     """
     Scan a workspace directory for symlinks.
@@ -305,15 +326,17 @@ def create_sync_plan(config: Config) -> SyncPlan:
     repos_missing = sorted(config_repos - code_repos)
 
     # Check symlink status for all configured repos
-    symlinks_to_create: list[tuple[str, str, str]] = []
-    symlinks_to_update: list[tuple[str, str, str]] = []
+    symlinks_to_create: list[tuple[str, str, str, str]] = []
+    symlinks_to_update: list[tuple[str, str, str, str]] = []
     symlinks_to_remove: list[tuple[str, str, str]] = []
-    symlink_conflicts: list[tuple[str, str, str]] = []
+    symlink_conflicts: list[tuple[str, str, str, str]] = []
 
     for ws_name, workspace in config.workspaces.items():
         for cat_path, category in workspace.categories.items():
-            for repo_name in category.repos:
-                symlink_path = get_symlink_path(workspace.path, cat_path, repo_name)
+            for entry in category.entries:
+                repo_name = entry.repo_name
+                symlink_name = entry.symlink_name
+                symlink_path = get_symlink_path(workspace.path, cat_path, symlink_name)
                 target_path = get_symlink_target(config.code_path, repo_name)
 
                 status = check_symlink_status(symlink_path, target_path)
@@ -321,22 +344,28 @@ def create_sync_plan(config: Config) -> SyncPlan:
                 if status == "missing":
                     # Only create if repo exists
                     if repo_name in code_repos:
-                        symlinks_to_create.append((ws_name, cat_path, repo_name))
+                        symlinks_to_create.append(
+                            (ws_name, cat_path, repo_name, symlink_name)
+                        )
                 elif status == "wrong_target":
                     if repo_name in code_repos:
-                        symlinks_to_update.append((ws_name, cat_path, repo_name))
+                        symlinks_to_update.append(
+                            (ws_name, cat_path, repo_name, symlink_name)
+                        )
                 elif status == "not_symlink":
                     # Can't create symlink - there's a real file/dir there
-                    symlink_conflicts.append((ws_name, cat_path, repo_name))
+                    symlink_conflicts.append(
+                        (ws_name, cat_path, repo_name, symlink_name)
+                    )
 
         # Check for orphaned symlinks (exist but not in config)
         existing_symlinks = scan_workspace_symlinks(workspace.path)
-        for cat_path, repos in existing_symlinks.items():
+        for cat_path, symlink_names_on_disk in existing_symlinks.items():
             maybe_category = workspace.categories.get(cat_path)
-            configured_repos = set(maybe_category.repos) if maybe_category else set()
-            for repo_name in repos:
-                if repo_name not in configured_repos:
-                    symlinks_to_remove.append((ws_name, cat_path, repo_name))
+            configured_symlinks = maybe_category.symlink_names if maybe_category else set()
+            for symlink_name in symlink_names_on_disk:
+                if symlink_name not in configured_symlinks:
+                    symlinks_to_remove.append((ws_name, cat_path, symlink_name))
 
     # Check for non-symlink directories in workspaces
     non_symlink_dirs: list[tuple[str, str, str]] = []
@@ -383,35 +412,35 @@ def apply_sync_plan(
     }
 
     # Create symlinks
-    for ws_name, cat_path, repo_name in plan.symlinks_to_create:
+    for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_create:
         workspace = config.workspaces[ws_name]
-        symlink_path = get_symlink_path(workspace.path, cat_path, repo_name)
+        symlink_path = get_symlink_path(workspace.path, cat_path, symlink_name)
         target_path = get_symlink_target(config.code_path, repo_name)
 
         if create_symlink(symlink_path, target_path, dry_run=dry_run):
-            results["created"].append(f"{ws_name}/{cat_path}/{repo_name}")
+            results["created"].append(f"{ws_name}/{cat_path}/{symlink_name}")
         else:
             results["errors"].append(f"Failed to create: {symlink_path}")
 
     # Update symlinks
-    for ws_name, cat_path, repo_name in plan.symlinks_to_update:
+    for ws_name, cat_path, repo_name, symlink_name in plan.symlinks_to_update:
         workspace = config.workspaces[ws_name]
-        symlink_path = get_symlink_path(workspace.path, cat_path, repo_name)
+        symlink_path = get_symlink_path(workspace.path, cat_path, symlink_name)
         target_path = get_symlink_target(config.code_path, repo_name)
 
         if update_symlink(symlink_path, target_path, dry_run=dry_run):
-            results["updated"].append(f"{ws_name}/{cat_path}/{repo_name}")
+            results["updated"].append(f"{ws_name}/{cat_path}/{symlink_name}")
         else:
             results["errors"].append(f"Failed to update: {symlink_path}")
 
     # Remove orphaned symlinks
     if remove_orphans:
-        for ws_name, cat_path, repo_name in plan.symlinks_to_remove:
+        for ws_name, cat_path, symlink_name in plan.symlinks_to_remove:
             workspace = config.workspaces[ws_name]
-            symlink_path = get_symlink_path(workspace.path, cat_path, repo_name)
+            symlink_path = get_symlink_path(workspace.path, cat_path, symlink_name)
 
             if remove_symlink(symlink_path, dry_run=dry_run):
-                results["removed"].append(f"{ws_name}/{cat_path}/{repo_name}")
+                results["removed"].append(f"{ws_name}/{cat_path}/{symlink_name}")
             else:
                 results["errors"].append(f"Failed to remove: {symlink_path}")
 
