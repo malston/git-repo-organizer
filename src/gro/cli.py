@@ -249,6 +249,12 @@ def status(ctx: Context) -> None:
         for ws_name, cat_path, repo_name in plan.symlinks_to_remove:
             console.print(f"  [red]-[/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
 
+    # Show symlink conflicts (directory exists where symlink should be)
+    if plan.symlink_conflicts:
+        console.print("\n[bold]Conflicts (directory exists where symlink should be):[/bold]")
+        for ws_name, cat_path, repo_name in plan.symlink_conflicts:
+            console.print(f"  [red]![/red] {format_symlink_path(ws_name, cat_path, repo_name)}")
+
     # Show non-symlink directories
     if plan.non_symlink_dirs:
         console.print("\n[bold]Non-symlink directories in workspace:[/bold]")

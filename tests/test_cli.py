@@ -339,6 +339,35 @@ class TestStatus:
         assert "Non-symlink directories" in result.output
         assert "direct-clone" in result.output
 
+    def test_shows_symlink_conflicts(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Shows conflicts where directory exists where symlink should be."""
+        # Create repo in code directory
+        (test_env["code"] / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create a directory (not a symlink) at the symlink target location
+        (test_env["workspace"] / "my-repo").mkdir()
+        (test_env["workspace"] / "my-repo" / "some-file.txt").write_text("conflict")
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(path=".", repos=["my-repo"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "status",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Conflicts" in result.output
+        assert "my-repo" in result.output
+
 
 class TestApply:
     """Tests for apply command."""

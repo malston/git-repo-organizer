@@ -61,7 +61,9 @@ def scan_workspace_symlinks(workspace_path: Path) -> dict[str, list[str]]:
                 result[cat_path].append(item.name)
             elif item.is_dir():
                 # Recurse into subdirectory
-                new_prefix = f"{category_prefix}/{item.name}" if category_prefix else item.name
+                new_prefix = (
+                    f"{category_prefix}/{item.name}" if category_prefix else item.name
+                )
                 scan_dir(item, new_prefix)
 
     scan_dir(workspace_path, "")
@@ -103,7 +105,11 @@ def scan_workspace_non_symlinks(workspace_path: Path) -> dict[str, list[str]]:
                     result[cat_path].append(item.name)
                 else:
                     # Recurse into subdirectory (category folder)
-                    new_prefix = f"{category_prefix}/{item.name}" if category_prefix else item.name
+                    new_prefix = (
+                        f"{category_prefix}/{item.name}"
+                        if category_prefix
+                        else item.name
+                    )
                     scan_dir(item, new_prefix)
 
     scan_dir(workspace_path, "")
@@ -208,7 +214,10 @@ def update_symlink(source: Path, target: Path, dry_run: bool = False) -> bool:
         return True
 
     if source.is_symlink():
-        source.unlink()
+        try:
+            source.unlink()
+        except OSError:
+            return False
 
     return create_symlink(source, target, dry_run=False)
 
@@ -261,7 +270,9 @@ def get_repo_status(config: Config, repo_name: str) -> RepoStatus:
         workspace = config.workspaces[ws_name]
         symlink_path = get_symlink_path(workspace.path, cat_path, repo_name)
         target_path = get_symlink_target(config.code_path, repo_name)
-        symlink_status[(ws_name, cat_path)] = check_symlink_status(symlink_path, target_path)
+        symlink_status[(ws_name, cat_path)] = check_symlink_status(
+            symlink_path, target_path
+        )
 
     return RepoStatus(
         name=repo_name,
@@ -297,6 +308,7 @@ def create_sync_plan(config: Config) -> SyncPlan:
     symlinks_to_create: list[tuple[str, str, str]] = []
     symlinks_to_update: list[tuple[str, str, str]] = []
     symlinks_to_remove: list[tuple[str, str, str]] = []
+    symlink_conflicts: list[tuple[str, str, str]] = []
 
     for ws_name, workspace in config.workspaces.items():
         for cat_path, category in workspace.categories.items():
@@ -314,8 +326,8 @@ def create_sync_plan(config: Config) -> SyncPlan:
                     if repo_name in code_repos:
                         symlinks_to_update.append((ws_name, cat_path, repo_name))
                 elif status == "not_symlink":
-                    # Can't update - there's a real file/dir there
-                    pass  # Will be reported as error
+                    # Can't create symlink - there's a real file/dir there
+                    symlink_conflicts.append((ws_name, cat_path, repo_name))
 
         # Check for orphaned symlinks (exist but not in config)
         existing_symlinks = scan_workspace_symlinks(workspace.path)
@@ -341,6 +353,7 @@ def create_sync_plan(config: Config) -> SyncPlan:
         symlinks_to_update=symlinks_to_update,
         symlinks_to_remove=symlinks_to_remove,
         non_symlink_dirs=non_symlink_dirs,
+        symlink_conflicts=symlink_conflicts,
     )
 
 
@@ -405,7 +418,9 @@ def apply_sync_plan(
     return results
 
 
-def cleanup_empty_directories(workspace_path: Path, dry_run: bool = False) -> list[Path]:
+def cleanup_empty_directories(
+    workspace_path: Path, dry_run: bool = False
+) -> list[Path]:
     """
     Remove empty directories in a workspace.
 

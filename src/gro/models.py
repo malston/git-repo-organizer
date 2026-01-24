@@ -126,6 +126,9 @@ class SyncPlan:
     non_symlink_dirs: list[tuple[str, str, str]] = field(
         default_factory=list
     )  # (workspace, category, dir_name)
+    symlink_conflicts: list[tuple[str, str, str]] = field(
+        default_factory=list
+    )  # (workspace, category, repo) - directory exists where symlink should be
 
     @property
     def has_changes(self) -> bool:
@@ -141,4 +144,4 @@ class SyncPlan:
     @property
     def has_warnings(self) -> bool:
         """Check if there are any warnings to display."""
-        return bool(self.non_symlink_dirs)
+        return bool(self.non_symlink_dirs or self.symlink_conflicts)
