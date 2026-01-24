@@ -67,7 +67,7 @@ workspaces:
 workspace: # Categories for "workspace"
   .: # Root category - symlinks directly to workspace/
     - repo1
-    - acme-git:git # Creates symlink "git" -> acme-git repo
+    - acme-code:git # Creates symlink "git" -> acme-code repo
   vmware/vsphere: # Nested category - workspace/vmware/vsphere/
     - pyvmomi
     - acme-tools:tools # Creates symlink "tools" -> acme-tools repo
@@ -80,7 +80,7 @@ Use `repo_name:alias` syntax to create symlinks with different names than the re
 ```yaml
 vendor/projects:
   - govc # Creates symlink "govc"
-  - acme-git:git # Creates symlink "git" pointing to acme-git repo
+  - acme-code:git # Creates symlink "git" pointing to acme-code repo
   - acme-stuff:stuff # Creates symlink "stuff" pointing to acme-stuff repo
 ```
 
@@ -89,7 +89,7 @@ This creates:
 ```
 workspace/vendor/projects/
 ├── govc -> ../../../code/govc
-├── git -> ../../../code/acme-git
+├── git -> ../../../code/acme-code
 └── stuff -> ../../../code/acme-stuff
 ```
 

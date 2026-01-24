@@ -18,8 +18,8 @@ class TestRepoEntry:
 
     def test_from_string_with_alias(self) -> None:
         """Parse string with alias."""
-        entry = RepoEntry.from_string("acme-git:git")
-        assert entry.repo_name == "acme-git"
+        entry = RepoEntry.from_string("acme-code:git")
+        assert entry.repo_name == "acme-code"
         assert entry.alias == "git"
 
     def test_symlink_name_no_alias(self) -> None:
@@ -29,7 +29,7 @@ class TestRepoEntry:
 
     def test_symlink_name_with_alias(self) -> None:
         """symlink_name returns alias when set."""
-        entry = RepoEntry(repo_name="acme-git", alias="git")
+        entry = RepoEntry(repo_name="acme-code", alias="git")
         assert entry.symlink_name == "git"
 
     def test_to_string_no_alias(self) -> None:
@@ -39,8 +39,8 @@ class TestRepoEntry:
 
     def test_to_string_with_alias(self) -> None:
         """to_string returns repo:alias format when aliased."""
-        entry = RepoEntry(repo_name="acme-git", alias="git")
-        assert entry.to_string() == "acme-git:git"
+        entry = RepoEntry(repo_name="acme-code", alias="git")
+        assert entry.to_string() == "acme-code:git"
 
     def test_roundtrip(self) -> None:
         """Parsing and serializing returns original string."""
@@ -84,11 +84,11 @@ class TestCategory:
         cat = Category(
             path=".",
             entries=[
-                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-code", alias="git"),
                 RepoEntry(repo_name="govc"),
             ],
         )
-        assert cat.repo_names == {"acme-git", "govc"}
+        assert cat.repo_names == {"acme-code", "govc"}
 
     def test_symlink_names_simple(self) -> None:
         """symlink_names returns set of symlink names (repo names when no alias)."""
@@ -106,7 +106,7 @@ class TestCategory:
         cat = Category(
             path=".",
             entries=[
-                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-code", alias="git"),
                 RepoEntry(repo_name="acme-stuff", alias="stuff"),
                 RepoEntry(repo_name="govc"),
             ],
@@ -161,11 +161,11 @@ class TestWorkspace:
         ws.categories["cat1"] = Category(
             path="cat1",
             entries=[
-                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-code", alias="git"),
                 RepoEntry(repo_name="govc"),
             ],
         )
-        assert ws.all_repos() == {"acme-git", "govc"}
+        assert ws.all_repos() == {"acme-code", "govc"}
 
     def test_find_repo_categories(self) -> None:
         """Find categories containing a repo."""
@@ -187,10 +187,10 @@ class TestWorkspace:
         ws = Workspace(path=Path("/workspace"))
         ws.categories["cat1"] = Category(
             path="cat1",
-            entries=[RepoEntry(repo_name="acme-git", alias="git")],
+            entries=[RepoEntry(repo_name="acme-code", alias="git")],
         )
         # Should find by repo_name
-        assert ws.find_repo_categories("acme-git") == ["cat1"]
+        assert ws.find_repo_categories("acme-code") == ["cat1"]
         # Should NOT find by alias
         assert ws.find_repo_categories("git") == []
 

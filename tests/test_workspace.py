@@ -360,7 +360,9 @@ class TestGetRepoStatus:
 
         config = Config(code_path=code_path)
         ws = Workspace(path=workspace_path)
-        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="my-repo")]
+        )
         config.workspaces["workspace"] = ws
 
         status = get_repo_status(config, "my-repo")
@@ -376,7 +378,9 @@ class TestGetRepoStatus:
 
         config = Config(code_path=code_path)
         ws = Workspace(path=tmp_path / "workspace")
-        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="missing-repo")])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="missing-repo")]
+        )
         config.workspaces["workspace"] = ws
 
         status = get_repo_status(config, "missing-repo")
@@ -432,7 +436,9 @@ class TestCreateSyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="missing-repo")])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="missing-repo")]
+        )
 
         plan = create_sync_plan(config)
         assert "missing-repo" in plan.repos_missing
@@ -451,7 +457,9 @@ class TestCreateSyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="my-repo")]
+        )
 
         plan = create_sync_plan(config)
         # 4-tuple: (workspace, category, repo_name, symlink_name)
@@ -492,7 +500,9 @@ class TestApplySyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="my-repo")]
+        )
 
         plan = create_sync_plan(config)
         results = apply_sync_plan(config, plan)
@@ -535,7 +545,9 @@ class TestApplySyncPlan:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="my-repo")])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="my-repo")]
+        )
 
         plan = create_sync_plan(config)
         results = apply_sync_plan(config, plan, dry_run=True)
@@ -595,7 +607,7 @@ class TestAliasedSymlinks:
         """Sync plan uses alias as symlink name."""
         code_path = tmp_path / "code"
         code_path.mkdir()
-        (code_path / "acme-git" / ".git").mkdir(parents=True)
+        (code_path / "acme-code" / ".git").mkdir(parents=True)
 
         workspace_path = tmp_path / "workspace"
         workspace_path.mkdir()
@@ -607,7 +619,7 @@ class TestAliasedSymlinks:
         ws = config.workspaces["workspace"]
         ws.categories["."] = Category(
             path=".",
-            entries=[RepoEntry(repo_name="acme-git", alias="git")],
+            entries=[RepoEntry(repo_name="acme-code", alias="git")],
         )
 
         plan = create_sync_plan(config)
@@ -616,14 +628,14 @@ class TestAliasedSymlinks:
         assert len(plan.symlinks_to_create) == 1
         ws_name, cat_path, repo_name, symlink_name = plan.symlinks_to_create[0]
         assert ws_name == "workspace"
-        assert repo_name == "acme-git"
+        assert repo_name == "acme-code"
         assert symlink_name == "git"
 
     def test_apply_creates_aliased_symlink(self, tmp_path: Path) -> None:
         """Apply creates symlink with alias name pointing to actual repo."""
         code_path = tmp_path / "code"
         code_path.mkdir()
-        (code_path / "acme-git" / ".git").mkdir(parents=True)
+        (code_path / "acme-code" / ".git").mkdir(parents=True)
 
         workspace_path = tmp_path / "workspace"
         workspace_path.mkdir()
@@ -635,7 +647,7 @@ class TestAliasedSymlinks:
         ws = config.workspaces["workspace"]
         ws.categories["."] = Category(
             path=".",
-            entries=[RepoEntry(repo_name="acme-git", alias="git")],
+            entries=[RepoEntry(repo_name="acme-code", alias="git")],
         )
 
         plan = create_sync_plan(config)
@@ -644,8 +656,8 @@ class TestAliasedSymlinks:
         # Symlink should be named "git"
         symlink = workspace_path / "git"
         assert symlink.is_symlink()
-        # But should point to acme-git repo
-        assert symlink.resolve() == code_path / "acme-git"
+        # But should point to acme-code repo
+        assert symlink.resolve() == code_path / "acme-code"
 
     def test_orphan_detection_uses_symlink_name(self, tmp_path: Path) -> None:
         """Orphan detection checks symlink name, not repo name."""
@@ -662,10 +674,10 @@ class TestAliasedSymlinks:
             workspace_paths=[workspace_path],
         )
         ws = config.workspaces["workspace"]
-        # Config has acme-git:git, so "git" symlink should NOT be orphaned
+        # Config has acme-code:git, so "git" symlink should NOT be orphaned
         ws.categories["."] = Category(
             path=".",
-            entries=[RepoEntry(repo_name="acme-git", alias="git")],
+            entries=[RepoEntry(repo_name="acme-code", alias="git")],
         )
 
         plan = create_sync_plan(config)
@@ -678,7 +690,7 @@ class TestAliasedSymlinks:
         code_path = tmp_path / "code"
         code_path.mkdir()
         (code_path / "govc" / ".git").mkdir(parents=True)
-        (code_path / "acme-git" / ".git").mkdir(parents=True)
+        (code_path / "acme-code" / ".git").mkdir(parents=True)
         (code_path / "acme-stuff" / ".git").mkdir(parents=True)
 
         workspace_path = tmp_path / "workspace"
@@ -693,7 +705,7 @@ class TestAliasedSymlinks:
             path="vendor/projects",
             entries=[
                 RepoEntry(repo_name="govc"),  # No alias
-                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-code", alias="git"),
                 RepoEntry(repo_name="acme-stuff", alias="stuff"),
             ],
         )
@@ -706,7 +718,7 @@ class TestAliasedSymlinks:
         assert (base / "govc").is_symlink()
         assert (base / "govc").resolve() == code_path / "govc"
         assert (base / "git").is_symlink()
-        assert (base / "git").resolve() == code_path / "acme-git"
+        assert (base / "git").resolve() == code_path / "acme-code"
         assert (base / "stuff").is_symlink()
         assert (base / "stuff").resolve() == code_path / "acme-stuff"
 
@@ -753,7 +765,9 @@ class TestParseGitRemoteUrl:
         """Parses HTTPS Enterprise GitHub URL."""
         from gro.workspace import parse_git_remote_url
 
-        result = parse_git_remote_url("https://github.enterprise.com/markalston/gro.git")
+        result = parse_git_remote_url(
+            "https://github.enterprise.com/markalston/gro.git"
+        )
         assert result == ("github.enterprise.com", "markalston", "gro")
 
     def test_ssh_gitlab_url(self) -> None:

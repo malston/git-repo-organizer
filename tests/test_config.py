@@ -106,7 +106,7 @@ class TestParseConfig:
             "workspace": {
                 "vendor/projects": [
                     "govc",
-                    "acme-git:git",
+                    "acme-code:git",
                     "acme-stuff:stuff",
                 ]
             },
@@ -120,7 +120,7 @@ class TestParseConfig:
         assert cat.entries[0].repo_name == "govc"
         assert cat.entries[0].alias is None
         # Second entry: with alias
-        assert cat.entries[1].repo_name == "acme-git"
+        assert cat.entries[1].repo_name == "acme-code"
         assert cat.entries[1].alias == "git"
         # Third entry: with alias
         assert cat.entries[2].repo_name == "acme-stuff"
@@ -133,7 +133,7 @@ class TestParseConfig:
             "workspaces": ["~/workspace"],
             "workspace": {
                 ".": [
-                    "acme-git:git",
+                    "acme-code:git",
                     "govc",
                 ]
             },
@@ -142,7 +142,7 @@ class TestParseConfig:
         ws = config.workspaces["workspace"]
         cat = ws.categories["."]
 
-        assert cat.repo_names == {"acme-git", "govc"}
+        assert cat.repo_names == {"acme-code", "govc"}
         assert cat.symlink_names == {"git", "govc"}
 
 
@@ -177,7 +177,7 @@ class TestSerializeConfig:
             path="vendor/projects",
             entries=[
                 RepoEntry(repo_name="govc"),
-                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-code", alias="git"),
                 RepoEntry(repo_name="acme-stuff", alias="stuff"),
             ],
         )
@@ -186,7 +186,7 @@ class TestSerializeConfig:
         repos = data["workspace"]["vendor/projects"]
 
         assert "govc" in repos
-        assert "acme-git:git" in repos
+        assert "acme-code:git" in repos
         assert "acme-stuff:stuff" in repos
 
     def test_roundtrip_with_aliases(self) -> None:
@@ -196,7 +196,7 @@ class TestSerializeConfig:
         ws.categories["."] = Category(
             path=".",
             entries=[
-                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-code", alias="git"),
                 RepoEntry(repo_name="govc"),
             ],
         )
@@ -207,7 +207,7 @@ class TestSerializeConfig:
         ws_restored = restored.workspaces["workspace"]
         cat = ws_restored.categories["."]
 
-        assert cat.repo_names == {"acme-git", "govc"}
+        assert cat.repo_names == {"acme-code", "govc"}
         assert cat.symlink_names == {"git", "govc"}
 
 
@@ -312,7 +312,7 @@ class TestValidateConfig:
         ws.categories["."] = Category(
             path=".",
             entries=[
-                RepoEntry(repo_name="acme-git", alias="git"),
+                RepoEntry(repo_name="acme-code", alias="git"),
                 RepoEntry(repo_name="other-git", alias="git"),
             ],
         )
@@ -335,7 +335,7 @@ class TestValidateConfig:
             path=".",
             entries=[
                 RepoEntry(repo_name="git"),  # symlink_name = "git"
-                RepoEntry(repo_name="acme-git", alias="git"),  # symlink_name = "git"
+                RepoEntry(repo_name="acme-code", alias="git"),  # symlink_name = "git"
             ],
         )
         config.workspaces["workspace"] = ws
