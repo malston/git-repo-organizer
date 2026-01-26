@@ -247,6 +247,7 @@ def init(
             console.print(f"[green]Created:[/green] {config.code_path}")
 
     # Adopt existing workspace symlinks if --scan
+    adopted_repos: set[str] = set()
     if scan:
         for ws_name, workspace in config.workspaces.items():
             if workspace.path.exists():
@@ -259,6 +260,7 @@ def init(
                         category = workspace.get_or_create_category(cat_path)
                         if entry.repo_name not in category.repo_names:
                             category.entries.append(entry)
+                            adopted_repos.add(entry.repo_name)
                             display = format_symlink_path(ws_name, cat_path, entry.symlink_name)
                             if entry.alias:
                                 console.print(
@@ -272,6 +274,8 @@ def init(
     # Scan existing repos if requested
     if scan and config.code_path.exists():
         repos = scan_code_dir(config.code_path)
+        # Exclude repos that were already adopted from workspace symlinks
+        repos = [r for r in repos if r not in adopted_repos]
         if repos:
             console.print(f"\nFound {len(repos)} repositories in {config.code_path}")
 

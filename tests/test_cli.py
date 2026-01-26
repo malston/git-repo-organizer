@@ -803,6 +803,45 @@ class TestInit:
         assert "tools" in workspace.categories
         assert "my-repo" in workspace.categories["tools"].repo_names
 
+    def test_scan_adopts_symlinks_with_aliases(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--scan preserves aliases when adopting symlinks."""
+        code_path = test_env["code"]
+        workspace_path = test_env["workspace"]
+        config_path = test_env["config"]
+
+        # Create repo with different name than symlink
+        (code_path / "acme-code" / ".git").mkdir(parents=True)
+
+        # Create aliased symlink
+        (workspace_path / "git").symlink_to(code_path / "acme-code")
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config_path),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(code_path),
+                "--workspace",
+                str(workspace_path),
+                "--scan",
+            ],
+        )
+
+        assert result.exit_code == 0
+
+        config = load_config(config_path)
+        workspace = config.workspaces["workspace"]
+        assert "." in workspace.categories
+        entries = workspace.categories["."].entries
+        assert len(entries) == 1
+        assert entries[0].repo_name == "acme-code"
+        assert entries[0].alias == "git"
+
 
 class TestStatus:
     """Tests for status command."""
