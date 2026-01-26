@@ -977,3 +977,23 @@ class TestAdoptWorkspaceSymlinks:
         assert cat_path == "vmware/vsphere"
         assert entry.repo_name == "pyvmomi"
         assert warnings == []
+
+    def test_skips_non_code_symlinks(self, tmp_path: Path) -> None:
+        """Warns and skips symlinks not pointing to code directory."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        external_path = tmp_path / "external"
+        external_path.mkdir()
+        (external_path / "tool").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "tool").symlink_to(external_path / "tool")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert entries == []
+        assert len(warnings) == 1
+        assert "not in code directory" in warnings[0]
