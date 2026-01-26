@@ -954,3 +954,26 @@ class TestAdoptWorkspaceSymlinks:
         assert entry.alias == "git"
         assert entry.symlink_name == "git"
         assert warnings == []
+
+    def test_nested_categories(self, tmp_path: Path) -> None:
+        """Derives category path from symlink location."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "pyvmomi").mkdir()
+        (code_path / "pyvmomi" / ".git").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "vmware" / "vsphere").mkdir(parents=True)
+        (workspace_path / "vmware" / "vsphere" / "pyvmomi").symlink_to(
+            code_path / "pyvmomi"
+        )
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert len(entries) == 1
+        cat_path, entry = entries[0]
+        assert cat_path == "vmware/vsphere"
+        assert entry.repo_name == "pyvmomi"
+        assert warnings == []
