@@ -7,6 +7,7 @@ from pathlib import Path
 from gro.config import create_default_config
 from gro.models import Category, Config, RepoEntry, Workspace
 from gro.workspace import (
+    adopt_workspace_symlinks,
     apply_sync_plan,
     check_symlink_status,
     cleanup_empty_directories,
@@ -909,3 +910,25 @@ class TestGetRepoRemotes:
 
         remotes = get_repo_remotes(non_git)
         assert remotes == {}
+
+
+class TestAdoptWorkspaceSymlinks:
+    """Tests for adopt_workspace_symlinks function."""
+
+    def test_basic_adoption(self, tmp_path: Path) -> None:
+        """Adopts symlink pointing to code directory."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "my-repo").mkdir()
+        (code_path / "my-repo" / ".git").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "my-repo").symlink_to(code_path / "my-repo")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert len(entries) == 1
+        assert entries[0] == (".", RepoEntry(repo_name="my-repo"))
+        assert warnings == []
