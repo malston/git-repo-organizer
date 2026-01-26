@@ -688,36 +688,70 @@ def sync(ctx: Context, workspace_name: str | None) -> None:
     repos_in_code = set(scan_code_dir(config.code_path))
     repos_in_config = config.all_repos()
 
+    # Also adopt orphaned workspace symlinks
+    adopted_count = 0
+    for ws_name, workspace in config.workspaces.items():
+        if workspace.path.exists():
+            entries, adopt_warnings = adopt_workspace_symlinks(workspace, config.code_path)
+            # Filter to only entries not already in config
+            orphaned_entries = [
+                (cat_path, entry)
+                for cat_path, entry in entries
+                if entry.repo_name not in repos_in_config
+            ]
+            if orphaned_entries:
+                console.print(f"\n[bold]Adopting orphaned symlinks from {ws_name}:[/bold]")
+                for cat_path, entry in orphaned_entries:
+                    category = workspace.get_or_create_category(cat_path)
+                    if entry.repo_name not in category.repo_names:
+                        category.entries.append(entry)
+                        repos_in_config.add(entry.repo_name)
+                        display = format_symlink_path(ws_name, cat_path, entry.symlink_name)
+                        if entry.alias:
+                            console.print(
+                                f"  [green]+[/green] {display} -> {entry.repo_name}"
+                            )
+                        else:
+                            console.print(f"  [green]+[/green] {display}")
+                        adopted_count += 1
+            for warning in adopt_warnings:
+                console.print(f"  [yellow]![/yellow] {warning}")
+
+    # Update uncategorized after adoption
     uncategorized = repos_in_code - repos_in_config
 
-    if not uncategorized:
+    added_count = 0
+
+    if uncategorized:
+        console.print(f"\nFound {len(uncategorized)} uncategorized repos:\n")
+
+        for repo in sorted(uncategorized):
+            if ctx.non_interactive:
+                # Add to root category of first workspace
+                if config.workspaces:
+                    target_ws_name = workspace_name or next(iter(config.workspaces.keys()))
+                    target_workspace = config.workspaces.get(target_ws_name)
+                    if target_workspace:
+                        category = target_workspace.get_or_create_category(".")
+                        category.entries.append(RepoEntry(repo_name=repo))
+                        console.print(f"  [green]+[/green] {repo} -> {target_ws_name}/.")
+                        added_count += 1
+            else:
+                if categorize_repo_interactive(config, repo):
+                    added_count += 1
+
+    total_added = added_count + adopted_count
+
+    if total_added == 0:
         console.print("[green]All repos are categorized![/green]")
         return
 
-    console.print(f"\nFound {len(uncategorized)} uncategorized repos:\n")
-
-    added_count = 0
-    for repo in sorted(uncategorized):
-        if ctx.non_interactive:
-            # Add to root category of first workspace
-            if config.workspaces:
-                ws_name = workspace_name or next(iter(config.workspaces.keys()))
-                workspace = config.workspaces.get(ws_name)
-                if workspace:
-                    category = workspace.get_or_create_category(".")
-                    category.entries.append(RepoEntry(repo_name=repo))
-                    console.print(f"  [green]+[/green] {repo} -> {ws_name}/.")
-                    added_count += 1
-        else:
-            if categorize_repo_interactive(config, repo):
-                added_count += 1
-
-    if added_count > 0:
+    if total_added > 0:
         if ctx.dry_run:
-            console.print(f"\n[blue]Would add {added_count} repos to config[/blue]")
+            console.print(f"\n[blue]Would add {total_added} repos to config[/blue]")
         else:
             save_config(config, ctx.config_path)
-            console.print(f"\n[green]Added {added_count} repos to config[/green]")
+            console.print(f"\n[green]Added {total_added} repos to config[/green]")
             console.print("[yellow]Run 'gro apply' to create symlinks[/yellow]")
 
 
