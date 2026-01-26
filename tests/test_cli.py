@@ -764,6 +764,45 @@ class TestInit:
         symlink = test_env["workspace"] / "my-repo"
         assert not symlink.exists()
 
+    def test_scan_adopts_existing_symlinks(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--scan adopts existing workspace symlinks."""
+        code_path = test_env["code"]
+        workspace_path = test_env["workspace"]
+        config_path = test_env["config"]
+
+        # Create repo in code directory
+        (code_path / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create existing symlink in workspace
+        (workspace_path / "tools").mkdir()
+        (workspace_path / "tools" / "my-repo").symlink_to(code_path / "my-repo")
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config_path),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(code_path),
+                "--workspace",
+                str(workspace_path),
+                "--scan",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Adopting existing symlinks" in result.output
+
+        # Verify config has the repo in correct category
+        config = load_config(config_path)
+        workspace = config.workspaces["workspace"]
+        assert "tools" in workspace.categories
+        assert "my-repo" in workspace.categories["tools"].repo_names
+
 
 class TestStatus:
     """Tests for status command."""

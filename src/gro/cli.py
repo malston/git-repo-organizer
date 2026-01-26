@@ -33,6 +33,7 @@ from gro.config import (
 )
 from gro.models import Category, Config, RepoEntry
 from gro.workspace import (
+    adopt_workspace_symlinks,
     apply_sync_plan,
     cleanup_empty_directories,
     create_symlink,
@@ -244,6 +245,29 @@ def init(
         else:
             config.code_path.mkdir(parents=True, exist_ok=True)
             console.print(f"[green]Created:[/green] {config.code_path}")
+
+    # Adopt existing workspace symlinks if --scan
+    if scan:
+        for ws_name, workspace in config.workspaces.items():
+            if workspace.path.exists():
+                entries, adopt_warnings = adopt_workspace_symlinks(
+                    workspace, config.code_path
+                )
+                if entries:
+                    console.print(f"\n[bold]Adopting existing symlinks from {ws_name}:[/bold]")
+                    for cat_path, entry in entries:
+                        category = workspace.get_or_create_category(cat_path)
+                        if entry.repo_name not in category.repo_names:
+                            category.entries.append(entry)
+                            display = format_symlink_path(ws_name, cat_path, entry.symlink_name)
+                            if entry.alias:
+                                console.print(
+                                    f"  [green]+[/green] {display} -> {entry.repo_name}"
+                                )
+                            else:
+                                console.print(f"  [green]+[/green] {display}")
+                for warning in adopt_warnings:
+                    console.print(f"  [yellow]![/yellow] {warning}")
 
     # Scan existing repos if requested
     if scan and config.code_path.exists():
