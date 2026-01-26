@@ -932,3 +932,25 @@ class TestAdoptWorkspaceSymlinks:
         assert len(entries) == 1
         assert entries[0] == (".", RepoEntry(repo_name="my-repo"))
         assert warnings == []
+
+    def test_alias_detection(self, tmp_path: Path) -> None:
+        """Detects alias when symlink name differs from repo name."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "acme-code").mkdir()
+        (code_path / "acme-code" / ".git").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "git").symlink_to(code_path / "acme-code")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert len(entries) == 1
+        cat_path, entry = entries[0]
+        assert cat_path == "."
+        assert entry.repo_name == "acme-code"
+        assert entry.alias == "git"
+        assert entry.symlink_name == "git"
+        assert warnings == []
