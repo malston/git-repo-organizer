@@ -2042,6 +2042,38 @@ workspaces:
         assert "tools" in workspace.categories
         assert "my-repo" in workspace.categories["tools"].repo_names
 
+    def test_skips_already_configured_repos(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """sync doesn't duplicate repos already in config."""
+        code_path = test_env["code"]
+        workspace_path = test_env["workspace"]
+        config_path = test_env["config"]
+
+        # Create repo in code directory
+        (code_path / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create config with the repo already configured
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+code: {code_path}
+workspaces:
+  - {workspace_path}
+workspace:
+  .:
+    - my-repo
+""")
+
+        # Create symlink (matching config)
+        (workspace_path / "my-repo").symlink_to(code_path / "my-repo")
+
+        result = runner.invoke(
+            main, ["--config", str(config_path), "--non-interactive", "sync"]
+        )
+
+        assert result.exit_code == 0
+        assert "All repos are categorized" in result.output
+
 
 class TestFind:
     """Tests for find command."""
