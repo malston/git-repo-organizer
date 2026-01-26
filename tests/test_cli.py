@@ -764,6 +764,84 @@ class TestInit:
         symlink = test_env["workspace"] / "my-repo"
         assert not symlink.exists()
 
+    def test_scan_adopts_existing_symlinks(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--scan adopts existing workspace symlinks."""
+        code_path = test_env["code"]
+        workspace_path = test_env["workspace"]
+        config_path = test_env["config"]
+
+        # Create repo in code directory
+        (code_path / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create existing symlink in workspace
+        (workspace_path / "tools").mkdir()
+        (workspace_path / "tools" / "my-repo").symlink_to(code_path / "my-repo")
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config_path),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(code_path),
+                "--workspace",
+                str(workspace_path),
+                "--scan",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Adopting existing symlinks" in result.output
+
+        # Verify config has the repo in correct category
+        config = load_config(config_path)
+        workspace = config.workspaces["workspace"]
+        assert "tools" in workspace.categories
+        assert "my-repo" in workspace.categories["tools"].repo_names
+
+    def test_scan_adopts_symlinks_with_aliases(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """--scan preserves aliases when adopting symlinks."""
+        code_path = test_env["code"]
+        workspace_path = test_env["workspace"]
+        config_path = test_env["config"]
+
+        # Create repo with different name than symlink
+        (code_path / "acme-code" / ".git").mkdir(parents=True)
+
+        # Create aliased symlink
+        (workspace_path / "git").symlink_to(code_path / "acme-code")
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config_path),
+                "--non-interactive",
+                "init",
+                "--code",
+                str(code_path),
+                "--workspace",
+                str(workspace_path),
+                "--scan",
+            ],
+        )
+
+        assert result.exit_code == 0
+
+        config = load_config(config_path)
+        workspace = config.workspaces["workspace"]
+        assert "." in workspace.categories
+        entries = workspace.categories["."].entries
+        assert len(entries) == 1
+        assert entries[0].repo_name == "acme-code"
+        assert entries[0].alias == "git"
+
 
 class TestStatus:
     """Tests for status command."""
@@ -1924,6 +2002,77 @@ class TestCat:
         # Verify config was not modified
         config = load_config(test_env["config"])
         assert "new-category" not in config.workspaces["workspace"].categories
+
+
+class TestSyncAdoptSymlinks:
+    """Tests for sync command adopting orphaned symlinks."""
+
+    def test_adopts_orphaned_symlinks(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """sync adopts orphaned workspace symlinks."""
+        code_path = test_env["code"]
+        workspace_path = test_env["workspace"]
+        config_path = test_env["config"]
+
+        # Create repo in code directory
+        (code_path / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create initial config without the repo
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+code: {code_path}
+workspaces:
+  - {workspace_path}
+""")
+
+        # Create orphaned symlink in workspace
+        (workspace_path / "tools").mkdir()
+        (workspace_path / "tools" / "my-repo").symlink_to(code_path / "my-repo")
+
+        result = runner.invoke(
+            main, ["--config", str(config_path), "--non-interactive", "sync"]
+        )
+
+        assert result.exit_code == 0
+        assert "Adopting orphaned symlinks" in result.output
+
+        config = load_config(config_path)
+        workspace = config.workspaces["workspace"]
+        assert "tools" in workspace.categories
+        assert "my-repo" in workspace.categories["tools"].repo_names
+
+    def test_skips_already_configured_repos(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """sync doesn't duplicate repos already in config."""
+        code_path = test_env["code"]
+        workspace_path = test_env["workspace"]
+        config_path = test_env["config"]
+
+        # Create repo in code directory
+        (code_path / "my-repo" / ".git").mkdir(parents=True)
+
+        # Create config with the repo already configured
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+code: {code_path}
+workspaces:
+  - {workspace_path}
+workspace:
+  .:
+    - my-repo
+""")
+
+        # Create symlink (matching config)
+        (workspace_path / "my-repo").symlink_to(code_path / "my-repo")
+
+        result = runner.invoke(
+            main, ["--config", str(config_path), "--non-interactive", "sync"]
+        )
+
+        assert result.exit_code == 0
+        assert "All repos are categorized" in result.output
 
 
 class TestFind:

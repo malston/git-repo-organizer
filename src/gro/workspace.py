@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from gro.models import Config, RepoStatus, SyncPlan
+from gro.models import Config, RepoEntry, RepoStatus, SyncPlan, Workspace
 
 
 def scan_code_dir(code_path: Path) -> list[str]:
@@ -195,6 +195,67 @@ def scan_workspace_symlinks(workspace_path: Path) -> dict[str, list[str]]:
 
     scan_dir(workspace_path, "")
     return result
+
+
+def adopt_workspace_symlinks(
+    workspace: Workspace,
+    code_path: Path,
+) -> tuple[list[tuple[str, RepoEntry]], list[str]]:
+    """
+    Scan workspace for symlinks pointing to code directory.
+
+    Args:
+        workspace: The workspace to scan.
+        code_path: Path to the code directory.
+
+    Returns:
+        Tuple of:
+        - List of (category_path, RepoEntry) to add to config
+        - List of warning messages for skipped symlinks
+    """
+    entries: list[tuple[str, RepoEntry]] = []
+    warnings: list[str] = []
+
+    if not workspace.path.exists():
+        return entries, warnings
+
+    def scan_dir(dir_path: Path, category_prefix: str) -> None:
+        """Recursively scan for symlinks."""
+        for item in dir_path.iterdir():
+            if item.is_symlink():
+                cat_path = category_prefix if category_prefix else "."
+                try:
+                    target = item.resolve()
+                    # Check for broken symlink (target doesn't exist)
+                    if not target.exists():
+                        warnings.append(f"Skipping {item.name} (broken symlink)")
+                        continue
+                    # Check if target is in code directory
+                    try:
+                        target.relative_to(code_path)
+                        repo_name = target.name
+                        symlink_name = item.name
+                        if symlink_name != repo_name:
+                            entry = RepoEntry(repo_name=repo_name, alias=symlink_name)
+                        else:
+                            entry = RepoEntry(repo_name=repo_name)
+                        entries.append((cat_path, entry))
+                    except ValueError:
+                        # Target not in code directory
+                        warnings.append(
+                            f"Skipping {item.name} -> {target} (not in code directory)"
+                        )
+                except OSError:
+                    # Broken symlink (e.g., permission error)
+                    warnings.append(f"Skipping {item.name} (broken symlink)")
+            elif item.is_dir():
+                new_prefix = (
+                    f"{category_prefix}/{item.name}" if category_prefix else item.name
+                )
+                scan_dir(item, new_prefix)
+
+    scan_dir(workspace.path, "")
+    return entries, warnings
 
 
 def scan_workspace_non_symlinks(workspace_path: Path) -> dict[str, list[str]]:

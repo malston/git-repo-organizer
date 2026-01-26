@@ -23,3 +23,6 @@ htmlcov/
 # Virtual environments
 .venv/
 venv/
+
+# Worktrees
+.worktrees/

@@ -7,6 +7,7 @@ from pathlib import Path
 from gro.config import create_default_config
 from gro.models import Category, Config, RepoEntry, Workspace
 from gro.workspace import (
+    adopt_workspace_symlinks,
     apply_sync_plan,
     check_symlink_status,
     cleanup_empty_directories,
@@ -909,3 +910,106 @@ class TestGetRepoRemotes:
 
         remotes = get_repo_remotes(non_git)
         assert remotes == {}
+
+
+class TestAdoptWorkspaceSymlinks:
+    """Tests for adopt_workspace_symlinks function."""
+
+    def test_basic_adoption(self, tmp_path: Path) -> None:
+        """Adopts symlink pointing to code directory."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "my-repo").mkdir()
+        (code_path / "my-repo" / ".git").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "my-repo").symlink_to(code_path / "my-repo")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert len(entries) == 1
+        assert entries[0] == (".", RepoEntry(repo_name="my-repo"))
+        assert warnings == []
+
+    def test_alias_detection(self, tmp_path: Path) -> None:
+        """Detects alias when symlink name differs from repo name."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "acme-code").mkdir()
+        (code_path / "acme-code" / ".git").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "git").symlink_to(code_path / "acme-code")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert len(entries) == 1
+        cat_path, entry = entries[0]
+        assert cat_path == "."
+        assert entry.repo_name == "acme-code"
+        assert entry.alias == "git"
+        assert entry.symlink_name == "git"
+        assert warnings == []
+
+    def test_nested_categories(self, tmp_path: Path) -> None:
+        """Derives category path from symlink location."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+        (code_path / "pyvmomi").mkdir()
+        (code_path / "pyvmomi" / ".git").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "vmware" / "vsphere").mkdir(parents=True)
+        (workspace_path / "vmware" / "vsphere" / "pyvmomi").symlink_to(
+            code_path / "pyvmomi"
+        )
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert len(entries) == 1
+        cat_path, entry = entries[0]
+        assert cat_path == "vmware/vsphere"
+        assert entry.repo_name == "pyvmomi"
+        assert warnings == []
+
+    def test_skips_non_code_symlinks(self, tmp_path: Path) -> None:
+        """Warns and skips symlinks not pointing to code directory."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        external_path = tmp_path / "external"
+        external_path.mkdir()
+        (external_path / "tool").mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "tool").symlink_to(external_path / "tool")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert entries == []
+        assert len(warnings) == 1
+        assert "not in code directory" in warnings[0]
+
+    def test_skips_broken_symlinks(self, tmp_path: Path) -> None:
+        """Warns and skips broken symlinks."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "broken").symlink_to(tmp_path / "nonexistent")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert entries == []
+        assert len(warnings) == 1
+        assert "broken symlink" in warnings[0]
