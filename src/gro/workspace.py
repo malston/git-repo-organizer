@@ -226,6 +226,10 @@ def adopt_workspace_symlinks(
                 cat_path = category_prefix if category_prefix else "."
                 try:
                     target = item.resolve()
+                    # Check for broken symlink (target doesn't exist)
+                    if not target.exists():
+                        warnings.append(f"Skipping {item.name} (broken symlink)")
+                        continue
                     # Check if target is in code directory
                     try:
                         target.relative_to(code_path)
@@ -242,7 +246,7 @@ def adopt_workspace_symlinks(
                             f"Skipping {item.name} -> {target} (not in code directory)"
                         )
                 except OSError:
-                    # Broken symlink
+                    # Broken symlink (e.g., permission error)
                     warnings.append(f"Skipping {item.name} (broken symlink)")
             elif item.is_dir():
                 new_prefix = (

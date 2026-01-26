@@ -997,3 +997,19 @@ class TestAdoptWorkspaceSymlinks:
         assert entries == []
         assert len(warnings) == 1
         assert "not in code directory" in warnings[0]
+
+    def test_skips_broken_symlinks(self, tmp_path: Path) -> None:
+        """Warns and skips broken symlinks."""
+        code_path = tmp_path / "code"
+        code_path.mkdir()
+
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir()
+        (workspace_path / "broken").symlink_to(tmp_path / "nonexistent")
+
+        workspace = Workspace(path=workspace_path)
+        entries, warnings = adopt_workspace_symlinks(workspace, code_path)
+
+        assert entries == []
+        assert len(warnings) == 1
+        assert "broken symlink" in warnings[0]
