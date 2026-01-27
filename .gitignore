@@ -26,3 +26,8 @@ venv/
 
 # Worktrees
 .worktrees/
+
+# Claude
+**/CLAUDE.md
+!.claude/CLAUDE.md
+!/CLAUDE.md
