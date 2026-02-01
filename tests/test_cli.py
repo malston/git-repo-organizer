@@ -1712,8 +1712,6 @@ class TestFmt:
         # Create an unsorted config manually
         config_content = """\
 code: {code}
-workspaces:
-- {workspace}
 workspace:
   vmware/vsphere:
   - pyvmomi
@@ -1721,7 +1719,7 @@ workspace:
   .:
   - zebra-repo
   - alpha-repo
-""".format(code=test_env["code"], workspace=test_env["workspace"])
+""".format(code=test_env["code"])
         test_env["config"].write_text(config_content)
 
         result = runner.invoke(
@@ -1750,13 +1748,11 @@ workspace:
         """Dry run shows what would change but doesn't modify file."""
         config_content = """\
 code: {code}
-workspaces:
-- {workspace}
 workspace:
   .:
   - zebra-repo
   - alpha-repo
-""".format(code=test_env["code"], workspace=test_env["workspace"])
+""".format(code=test_env["code"])
         test_env["config"].write_text(config_content)
         original_content = test_env["config"].read_text()
 
@@ -2022,8 +2018,7 @@ class TestSyncAdoptSymlinks:
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 code: {code_path}
-workspaces:
-  - {workspace_path}
+{workspace_path}: {{}}
 """)
 
         # Create orphaned symlink in workspace
@@ -2038,7 +2033,8 @@ workspaces:
         assert "Adopting orphaned symlinks" in result.output
 
         config = load_config(config_path)
-        workspace = config.workspaces["workspace"]
+        ws_name = workspace_path.name
+        workspace = config.workspaces[ws_name]
         assert "tools" in workspace.categories
         assert "my-repo" in workspace.categories["tools"].repo_names
 
@@ -2057,9 +2053,7 @@ workspaces:
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 code: {code_path}
-workspaces:
-  - {workspace_path}
-workspace:
+{workspace_path}:
   .:
     - my-repo
 """)

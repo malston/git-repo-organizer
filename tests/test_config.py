@@ -44,14 +44,24 @@ class TestParseConfig:
         assert config.code_path == Path.home() / "code"
         assert config.workspaces == {}
 
+    def test_code_defaults_to_home_code(self) -> None:
+        """Code path defaults to ~/code if not specified."""
+        data = {
+            "workspace": {".": ["repo1"]},
+        }
+        config = parse_config(data)
+        assert config.code_path == Path.home() / "code"
+
     def test_with_workspaces(self) -> None:
         """Parse config with workspaces."""
         data = {
             "code": "~/code",
-            "workspaces": ["~/workspace", "~/projects"],
             "workspace": {
                 ".": ["foo"],
                 "vmware": ["bar"],
+            },
+            "projects": {
+                ".": ["baz"],
             },
         }
         config = parse_config(data)
@@ -64,16 +74,12 @@ class TestParseConfig:
         assert "vmware" in ws.categories
         assert "foo" in ws.categories["."].repo_names
 
-    def test_missing_code_raises(self) -> None:
-        """Missing code field raises ConfigError."""
-        with pytest.raises(ConfigError, match="missing required 'code'"):
-            parse_config({})
-
     def test_basename_collision_raises(self) -> None:
         """Duplicate workspace basenames raise ConfigError."""
         data = {
             "code": "~/code",
-            "workspaces": ["/path/to/work", "/other/path/to/work"],
+            "~/path/to/work": {".": ["repo1"]},
+            "~/other/path/to/work": {".": ["repo2"]},
         }
         with pytest.raises(ConfigError, match="collision"):
             parse_config(data)
@@ -82,7 +88,6 @@ class TestParseConfig:
         """Non-dict workspace config raises ConfigError."""
         data = {
             "code": "~/code",
-            "workspaces": ["~/workspace"],
             "workspace": "invalid",
         }
         with pytest.raises(ConfigError, match="must be a mapping"):
@@ -92,7 +97,6 @@ class TestParseConfig:
         """Non-list category raises ConfigError."""
         data = {
             "code": "~/code",
-            "workspaces": ["~/workspace"],
             "workspace": {"cat": "not-a-list"},
         }
         with pytest.raises(ConfigError, match="must be a list"):
@@ -102,7 +106,6 @@ class TestParseConfig:
         """Parses repo entries with aliases."""
         data = {
             "code": "~/code",
-            "workspaces": ["~/workspace"],
             "workspace": {
                 "vendor/projects": [
                     "govc",
@@ -130,7 +133,6 @@ class TestParseConfig:
         """After parsing, repo_names and symlink_names are correct."""
         data = {
             "code": "~/code",
-            "workspaces": ["~/workspace"],
             "workspace": {
                 ".": [
                     "acme-code:git",
@@ -252,6 +254,136 @@ class TestCreateDefaultConfig:
         )
         assert config.code_path == tmp_path / "mycode"
         assert len(config.workspaces) == 2
+
+
+class TestSimplifiedConfigFormat:
+    """Tests for simplified config format where top-level keys are workspaces."""
+
+    def test_simple_workspace_name_becomes_home_path(self) -> None:
+        """Simple name like 'Projects' becomes ~/Projects."""
+        data = {
+            "code": "~/code",
+            "Projects": {
+                ".": ["repo1"],
+            },
+        }
+        config = parse_config(data)
+        assert "Projects" in config.workspaces
+        assert config.workspaces["Projects"].path == Path.home() / "Projects"
+
+    def test_tilde_path_used_as_is(self) -> None:
+        """Path starting with ~ is used as-is."""
+        data = {
+            "code": "~/code",
+            "~/work/projects": {
+                ".": ["repo1"],
+            },
+        }
+        config = parse_config(data)
+        # Workspace name is the basename
+        assert "projects" in config.workspaces
+        assert config.workspaces["projects"].path == Path.home() / "work" / "projects"
+
+    def test_absolute_path_used_as_is(self) -> None:
+        """Absolute path starting with / is used as-is."""
+        data = {
+            "code": "~/code",
+            "/tmp/myworkspace": {
+                ".": ["repo1"],
+            },
+        }
+        config = parse_config(data)
+        assert "myworkspace" in config.workspaces
+        # Path gets resolved (on macOS /tmp -> /private/tmp)
+        assert config.workspaces["myworkspace"].path == Path("/tmp/myworkspace").resolve()
+
+    def test_multiple_workspaces(self) -> None:
+        """Multiple top-level workspace keys work correctly."""
+        data = {
+            "code": "~/code",
+            "Projects": {
+                ".": ["repo1"],
+            },
+            "work": {
+                "tools": ["repo2"],
+            },
+        }
+        config = parse_config(data)
+        assert len(config.workspaces) == 2
+        assert "Projects" in config.workspaces
+        assert "work" in config.workspaces
+
+    def test_workspace_with_categories(self) -> None:
+        """Workspace categories are parsed correctly."""
+        data = {
+            "code": "~/code",
+            "Projects": {
+                ".": ["root-repo"],
+                "mpm": ["kuzu-memory", "mcp-ticketer"],
+            },
+        }
+        config = parse_config(data)
+        ws = config.workspaces["Projects"]
+        assert "." in ws.categories
+        assert "mpm" in ws.categories
+        assert "root-repo" in ws.categories["."].repo_names
+        assert "kuzu-memory" in ws.categories["mpm"].repo_names
+
+    def test_old_workspaces_list_raises_error(self) -> None:
+        """Old 'workspaces' list format raises ConfigError."""
+        data = {
+            "code": "~/code",
+            "workspaces": ["~/workspace"],
+            "workspace": {".": ["repo1"]},
+        }
+        with pytest.raises(ConfigError, match="workspaces.*no longer supported"):
+            parse_config(data)
+
+    def test_basename_collision_raises(self) -> None:
+        """Two workspaces with same basename raise ConfigError."""
+        data = {
+            "code": "~/code",
+            "~/path/to/work": {".": ["repo1"]},
+            "~/other/work": {".": ["repo2"]},
+        }
+        with pytest.raises(ConfigError, match="collision"):
+            parse_config(data)
+
+    def test_serialize_uses_simple_name_for_home_dir(self) -> None:
+        """Serialization uses simple name for ~/Name paths."""
+        ws = Workspace(path=Path.home() / "Projects")
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="repo1")])
+        config = Config(code_path=Path.home() / "code", workspaces={"Projects": ws})
+
+        data = serialize_config(config)
+        assert "Projects" in data
+        assert "workspaces" not in data
+
+    def test_serialize_uses_full_path_when_needed(self) -> None:
+        """Serialization uses full path for non-standard locations."""
+        ws = Workspace(path=Path.home() / "work" / "projects")
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="repo1")])
+        config = Config(code_path=Path.home() / "code", workspaces={"projects": ws})
+
+        data = serialize_config(config)
+        assert "~/work/projects" in data
+        assert "workspaces" not in data
+
+    def test_roundtrip_simple_name(self) -> None:
+        """Config with simple workspace name survives roundtrip."""
+        original_data = {
+            "code": "~/code",
+            "Projects": {
+                "mpm": ["repo1", "repo2"],
+            },
+        }
+        config = parse_config(original_data)
+        serialized = serialize_config(config)
+        restored = parse_config(serialized)
+
+        assert "Projects" in restored.workspaces
+        assert restored.workspaces["Projects"].path == Path.home() / "Projects"
+        assert "mpm" in restored.workspaces["Projects"].categories
 
 
 class TestValidateConfig:

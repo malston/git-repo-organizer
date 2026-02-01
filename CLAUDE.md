@@ -101,28 +101,37 @@ uv tool install -e --force .    # Editable global install (reflects source chang
 
 ## Config Format
 
+Any top-level key except `code` is treated as a workspace:
+
 ```yaml
 code: ~/code
-workspaces:
-  - ~/workspace
-workspace: # Categories for "workspace"
+workspace: # Simple name -> ~/workspace
   .: # Root category - symlinks directly to workspace/
     - repo1
     - acme-code:git # Creates symlink "git" -> acme-code repo
   vmware/vsphere: # Nested category - workspace/vmware/vsphere/
     - pyvmomi
     - acme-tools:tools # Creates symlink "tools" -> acme-tools repo
+~/work/projects: # Full path -> ~/work/projects
+  tools:
+    - my-tool
 ```
+
+Workspace path resolution:
+
+- `Projects` -> `~/Projects` (simple name gets `~/` prepended)
+- `~/work/projects` -> `~/work/projects` (paths with `~` or `/` used as-is)
 
 ### Aliased Symlinks
 
 Use `repo_name:alias` syntax to create symlinks with different names than the repository:
 
 ```yaml
-vendor/projects:
-  - govc # Creates symlink "govc"
-  - acme-code:git # Creates symlink "git" pointing to acme-code repo
-  - acme-stuff:stuff # Creates symlink "stuff" pointing to acme-stuff repo
+workspace:
+  vendor/projects:
+    - govc # Creates symlink "govc"
+    - acme-code:git # Creates symlink "git" pointing to acme-code repo
+    - acme-stuff:stuff # Creates symlink "stuff" pointing to acme-stuff repo
 ```
 
 This creates:

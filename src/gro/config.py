@@ -59,9 +59,24 @@ def load_config(path: Path | None = None) -> Config:
     return parse_config(data)
 
 
+def _key_to_workspace_path(key: str) -> Path:
+    """Convert a config key to a workspace path.
+
+    Simple names like 'Projects' become ~/Projects.
+    Paths starting with ~ or / are used as-is.
+    """
+    if key.startswith("~") or key.startswith("/"):
+        return expand_path(key)
+    return expand_path(f"~/{key}")
+
+
 def parse_config(data: dict[str, Any]) -> Config:
     """
     Parse config data into Config object.
+
+    Config format: Any top-level key except 'code' is a workspace.
+    - Simple names like 'Projects' become ~/Projects
+    - Paths like '~/work/projects' or '/tmp/ws' are used as-is
 
     Args:
         data: Raw config data from YAML.
@@ -72,60 +87,68 @@ def parse_config(data: dict[str, Any]) -> Config:
     Raises:
         ConfigError: If config structure is invalid.
     """
-    # Validate required fields
-    if "code" not in data:
-        raise ConfigError("Config missing required 'code' field")
-
-    code_path = expand_path(data["code"])
-
-    # Parse workspaces list
-    workspace_paths: list[Path] = []
+    # Reject old format
     if "workspaces" in data:
-        if not isinstance(data["workspaces"], list):
-            raise ConfigError("'workspaces' must be a list")
-        workspace_paths = [expand_path(p) for p in data["workspaces"]]
+        raise ConfigError(
+            "The 'workspaces' list is no longer supported. "
+            "Use top-level keys for workspaces instead. Example:\n"
+            "  code: ~/code\n"
+            "  Projects:\n"
+            "    .: [repo1, repo2]"
+        )
 
-    # Check for basename collisions
-    basenames: dict[str, Path] = {}
-    for ws_path in workspace_paths:
-        name = ws_path.name
-        if name in basenames:
+    # Code path defaults to ~/code
+    code_path = expand_path(data.get("code", "~/code"))
+
+    # Collect workspace keys (everything except 'code')
+    workspace_keys = [k for k in data if k != "code"]
+
+    # Build workspace paths and check for basename collisions
+    basenames: dict[str, tuple[str, Path]] = {}  # basename -> (key, path)
+    workspace_paths: dict[str, Path] = {}  # key -> path
+
+    for key in workspace_keys:
+        ws_path = _key_to_workspace_path(key)
+        ws_name = ws_path.name
+
+        if ws_name in basenames:
+            existing_key, existing_path = basenames[ws_name]
             raise ConfigError(
-                f"Workspace basename collision: '{name}' used by both "
-                f"{basenames[name]} and {ws_path}"
+                f"Workspace basename collision: '{ws_name}' used by both "
+                f"'{existing_key}' ({existing_path}) and '{key}' ({ws_path})"
             )
-        basenames[name] = ws_path
+        basenames[ws_name] = (key, ws_path)
+        workspace_paths[key] = ws_path
 
     # Parse workspace configurations
     workspaces: dict[str, Workspace] = {}
 
-    for ws_path in workspace_paths:
+    for key in workspace_keys:
+        ws_path = workspace_paths[key]
         ws_name = ws_path.name
         workspace = Workspace(path=ws_path)
 
-        # Look for workspace config section
-        if ws_name in data:
-            ws_data = data[ws_name]
-            if not isinstance(ws_data, dict):
-                raise ConfigError(f"Workspace '{ws_name}' config must be a mapping")
+        ws_data = data[key]
+        if not isinstance(ws_data, dict):
+            raise ConfigError(f"Workspace '{key}' config must be a mapping")
 
-            for cat_path, repo_strs in ws_data.items():
-                if repo_strs is None:
-                    repo_strs = []
-                if not isinstance(repo_strs, list):
+        for cat_path, repo_strs in ws_data.items():
+            if repo_strs is None:
+                repo_strs = []
+            if not isinstance(repo_strs, list):
+                raise ConfigError(
+                    f"Category '{cat_path}' in workspace '{key}' must be a list"
+                )
+            # Parse repo strings into RepoEntry objects
+            entries: list[RepoEntry] = []
+            for repo_str in repo_strs:
+                if not isinstance(repo_str, str):
                     raise ConfigError(
-                        f"Category '{cat_path}' in workspace '{ws_name}' must be a list"
+                        f"Repo names must be strings, got {type(repo_str).__name__} in "
+                        f"'{key}/{cat_path}'"
                     )
-                # Parse repo strings into RepoEntry objects
-                entries: list[RepoEntry] = []
-                for repo_str in repo_strs:
-                    if not isinstance(repo_str, str):
-                        raise ConfigError(
-                            f"Repo names must be strings, got {type(repo_str).__name__} in "
-                            f"'{ws_name}/{cat_path}'"
-                        )
-                    entries.append(RepoEntry.from_string(repo_str))
-                workspace.categories[cat_path] = Category(path=cat_path, entries=entries)
+                entries.append(RepoEntry.from_string(repo_str))
+            workspace.categories[cat_path] = Category(path=cat_path, entries=entries)
 
         workspaces[ws_name] = workspace
 
@@ -152,9 +175,33 @@ def save_config(config: Config, path: Path | None = None) -> None:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
 
+def _workspace_key(ws_path: Path) -> str:
+    """Get the config key for a workspace path.
+
+    Uses simple name if path is directly under home (~/Name -> Name).
+    Otherwise uses full path with ~ prefix.
+    """
+    home = Path.home()
+    try:
+        rel = ws_path.relative_to(home)
+        parts = rel.parts
+        if len(parts) == 1:
+            # Directly under home: ~/Projects -> Projects
+            return parts[0]
+        else:
+            # Nested: ~/work/projects -> ~/work/projects
+            return f"~/{rel}"
+    except ValueError:
+        # Not under home, use absolute path
+        return str(ws_path)
+
+
 def serialize_config(config: Config) -> dict[str, Any]:
     """
     Serialize Config object to dict for YAML.
+
+    Output format uses top-level keys for workspaces (no 'workspaces' list).
+    Simple paths like ~/Projects are serialized as just 'Projects'.
 
     Args:
         config: Config object to serialize.
@@ -176,20 +223,16 @@ def serialize_config(config: Config) -> dict[str, Any]:
 
     data["code"] = path_str(config.code_path)
 
-    # Workspaces list
-    if config.workspaces:
-        data["workspaces"] = [path_str(ws.path) for ws in config.workspaces.values()]
-
-    # Workspace configurations
-    for ws_name, workspace in config.workspaces.items():
-        if workspace.categories:
-            ws_data: dict[str, list[str]] = {}
-            for cat_path, category in sorted(workspace.categories.items()):
-                ws_data[cat_path] = sorted(
-                    [entry.to_string() for entry in category.entries]
-                )
-            if ws_data:
-                data[ws_name] = ws_data
+    # Workspace configurations as top-level keys
+    for workspace in config.workspaces.values():
+        ws_key = _workspace_key(workspace.path)
+        ws_data: dict[str, list[str]] = {}
+        for cat_path, category in sorted(workspace.categories.items()):
+            ws_data[cat_path] = sorted(
+                [entry.to_string() for entry in category.entries]
+            )
+        # Always include the workspace, even if no categories yet
+        data[ws_key] = ws_data if ws_data else {}
 
     return data
 
