@@ -454,14 +454,22 @@ def status(ctx: Context) -> None:
         for dir_name in non_repos:
             console.print(f"  [yellow]?[/yellow] {dir_name}")
 
-    # Summary
+    # Summary - give context-appropriate guidance
+    has_symlink_changes = bool(
+        plan.symlinks_to_create or plan.symlinks_to_update or plan.symlinks_to_remove
+    )
+    has_uncategorized = bool(plan.repos_to_add)
+
     if not plan.has_changes and not plan.has_warnings:
         console.print("\n[green]Everything is in sync![/green]")
-    elif plan.has_changes:
-        if plan.symlinks_to_remove:
-            console.print("\n[yellow]Run 'gro apply --prune' to sync symlinks[/yellow]")
-        else:
-            console.print("\n[yellow]Run 'gro apply' to sync symlinks[/yellow]")
+    else:
+        if has_symlink_changes:
+            if plan.symlinks_to_remove:
+                console.print("\n[yellow]Run 'gro apply --prune' to sync symlinks[/yellow]")
+            else:
+                console.print("\n[yellow]Run 'gro apply' to sync symlinks[/yellow]")
+        if has_uncategorized:
+            console.print("[yellow]Run 'gro sync' to categorize repos[/yellow]")
 
 
 @main.command()
