@@ -2257,3 +2257,169 @@ class TestFind:
             ],
         )
         assert result.exit_code == 1
+
+
+class TestClone:
+    """Tests for clone command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "clone",
+                "https://github.com/org/repo.git",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_happy_path(
+        self, runner: CliRunner, test_env: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Clones repo, categorizes non-interactively, creates symlink."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        def mock_clone_repo(url: str, dest: Path) -> tuple[bool, str]:
+            # Simulate successful clone by creating .git dir
+            dest.mkdir(parents=True)
+            (dest / ".git").mkdir()
+            return (True, "")
+
+        monkeypatch.setattr("gro.cli.clone_repo", mock_clone_repo)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "clone",
+                "https://github.com/org/my-repo.git",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Cloned" in result.output
+        assert "Config updated" in result.output
+
+        # Verify config was updated
+        config = load_config(test_env["config"])
+        assert "my-repo" in config.all_repos()
+
+        # Verify symlink was created
+        symlink_path = test_env["workspace"] / "my-repo"
+        assert symlink_path.is_symlink()
+
+    def test_already_exists(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Fails if repo directory already exists in code path."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        # Pre-create the repo directory
+        (test_env["code"] / "my-repo").mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "clone",
+                "https://github.com/org/my-repo.git",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Already exists" in result.output
+
+    def test_clone_fails(
+        self, runner: CliRunner, test_env: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Shows error when git clone fails, no config change."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        original_config_text = test_env["config"].read_text()
+
+        def mock_clone_repo(url: str, dest: Path) -> tuple[bool, str]:
+            return (False, "fatal: repository not found")
+
+        monkeypatch.setattr("gro.cli.clone_repo", mock_clone_repo)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "clone",
+                "https://github.com/org/my-repo.git",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Clone failed" in result.output
+        assert "repository not found" in result.output
+
+        # Config should be unchanged
+        assert test_env["config"].read_text() == original_config_text
+
+    def test_name_override(
+        self, runner: CliRunner, test_env: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--name flag overrides directory name."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        def mock_clone_repo(url: str, dest: Path) -> tuple[bool, str]:
+            assert dest.name == "custom-name"
+            dest.mkdir(parents=True)
+            (dest / ".git").mkdir()
+            return (True, "")
+
+        monkeypatch.setattr("gro.cli.clone_repo", mock_clone_repo)
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--non-interactive",
+                "clone",
+                "--name",
+                "custom-name",
+                "https://github.com/org/my-repo.git",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Cloned" in result.output
+
+        # Verify config uses custom name
+        config = load_config(test_env["config"])
+        assert "custom-name" in config.all_repos()
+
+    def test_invalid_url(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Fails with unparseable URL."""
+        config = Config(code_path=test_env["code"])
+        config.workspaces["workspace"] = Workspace(path=test_env["workspace"])
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "clone",
+                "not-a-valid-url",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Cannot parse repo name" in result.output

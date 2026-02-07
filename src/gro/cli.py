@@ -36,6 +36,7 @@ from gro.workspace import (
     adopt_workspace_symlinks,
     apply_sync_plan,
     cleanup_empty_directories,
+    clone_repo,
     create_symlink,
     create_sync_plan,
     get_repo_remotes,
@@ -836,6 +837,78 @@ def add(ctx: Context, repo_name: str) -> None:
         console.print("[green]Config updated[/green]")
 
         # Create symlinks for the newly added repo
+        locations = config.find_repo_locations(repo_name)
+        for ws_name, cat_path in locations:
+            workspace = config.workspaces[ws_name]
+            symlink_path = get_symlink_path(workspace.path, cat_path, repo_name)
+            if not symlink_path.exists():
+                target = config.code_path / repo_name
+                if create_symlink(symlink_path, target):
+                    display = format_symlink_path(ws_name, cat_path, repo_name)
+                    console.print(f"[green]Created symlink:[/green] {display}")
+
+
+@main.command()
+@click.argument("url")
+@click.option("--name", "-n", help="Override repo directory name")
+@pass_context
+def clone(ctx: Context, url: str, name: str | None) -> None:
+    """Clone a repo into the code directory and categorize it.
+
+    Clones the repo with --recursive, then interactively assigns it
+    to a workspace category and creates symlinks.
+    """
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        console.print("Run 'gro init' to create a config file.")
+        raise SystemExit(1)
+
+    config = ctx.config
+
+    # Extract repo name from URL
+    if name:
+        repo_name = name
+    else:
+        parsed = parse_git_remote_url(url)
+        if not parsed:
+            console.print(f"[red]Cannot parse repo name from URL:[/red] {url}")
+            raise SystemExit(1)
+        _domain, _org, repo_name = parsed
+
+    # Check if repo already exists
+    dest = config.code_path / repo_name
+    if dest.exists():
+        console.print(f"[red]Already exists:[/red] {dest}")
+        raise SystemExit(1)
+
+    # Clone
+    console.print(f"Cloning into {dest}...")
+    success, err = clone_repo(url, dest)
+    if not success:
+        console.print(f"[red]Clone failed:[/red] {err}")
+        raise SystemExit(1)
+
+    console.print(f"[green]Cloned:[/green] {repo_name}")
+
+    # Categorize
+    if ctx.non_interactive:
+        if config.workspaces:
+            ws_name = next(iter(config.workspaces.keys()))
+            workspace = config.workspaces[ws_name]
+            category = workspace.get_or_create_category(".")
+            category.entries.append(RepoEntry(repo_name=repo_name))
+            path = format_symlink_path(ws_name, ".", repo_name)
+            console.print(f"Added {repo_name} to {path}")
+    else:
+        categorize_repo_interactive(config, repo_name)
+
+    # Save config and create symlinks
+    if ctx.dry_run:
+        console.print("[blue]Dry run - config not saved[/blue]")
+    else:
+        save_config(config, ctx.config_path)
+        console.print("[green]Config updated[/green]")
+
         locations = config.find_repo_locations(repo_name)
         for ws_name, cat_path in locations:
             workspace = config.workspaces[ws_name]
