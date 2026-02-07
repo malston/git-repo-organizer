@@ -117,6 +117,23 @@ def parse_git_remote_url(url: str) -> tuple[str, str, str] | None:
     return None
 
 
+def clone_repo(url: str, dest: Path) -> tuple[bool, str]:
+    """Clone a git repo with --recursive. Returns (success, error_msg)."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "clone", "--recursive", url, str(dest)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return (False, result.stderr.strip())
+        return (True, "")
+    except (subprocess.SubprocessError, FileNotFoundError) as e:
+        return (False, str(e))
+
+
 def get_repo_remotes(repo_path: Path) -> dict[str, str]:
     """
     Get all remotes for a git repository.
