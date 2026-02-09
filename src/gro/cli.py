@@ -32,6 +32,7 @@ from gro.config import (
     validate_config,
 )
 from gro.models import Category, Config, RepoEntry
+from gro.vscode import generate_workspace_data, workspace_file_name, write_workspace_file
 from gro.workspace import (
     adopt_workspace_symlinks,
     apply_sync_plan,
@@ -1293,6 +1294,72 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
         console.print(f"\n[bold]{repo_name}[/bold]")
         console.print(f"  Location: {display_path}")
         console.print(f"  Path: [green]{full_path}[/green]")
+
+
+@main.command()
+@click.argument("workspace_name")
+@click.argument("category_path", required=False)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    help="Output directory for workspace file",
+)
+@click.option(
+    "--name",
+    "-n",
+    "file_name",
+    help="Override generated filename (without .code-workspace extension)",
+)
+@pass_context
+def vscode(
+    ctx: Context,
+    workspace_name: str,
+    category_path: str | None,
+    output_dir: Path | None,
+    file_name: str | None,
+) -> None:
+    """Generate VS Code workspace file from config.
+
+    Creates a .code-workspace file with relative paths to workspace symlinks.
+    WORKSPACE_NAME is the gro workspace to generate for.
+    CATEGORY_PATH optionally filters to repos in a specific category.
+    """
+    if not ctx.has_config():
+        console.print(f"[red]Config not found:[/red] {ctx.config_path}")
+        raise SystemExit(1)
+
+    config = ctx.config
+
+    # Resolve output directory: -o flag > config setting > cwd
+    if output_dir is None:
+        output_dir = config.vscode_workspaces_path or Path.cwd()
+
+    try:
+        data = generate_workspace_data(
+            config, workspace_name, category_path, output_dir=output_dir
+        )
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1) from None
+
+    if file_name is not None:
+        if not file_name.endswith(".code-workspace"):
+            file_name = f"{file_name}.code-workspace"
+        filename = file_name
+    else:
+        filename = workspace_file_name(workspace_name, category_path)
+    output_path = output_dir / filename
+
+    if ctx.dry_run:
+        folder_count = len(data["folders"])
+        console.print(f"[blue]Would create:[/blue] {output_path} ({folder_count} folders)")
+        return
+
+    write_workspace_file(data, output_path)
+    folder_count = len(data["folders"])
+    console.print(f"[green]Created:[/green] {output_path} ({folder_count} folders)")
 
 
 if __name__ == "__main__":

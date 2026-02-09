@@ -2257,3 +2257,353 @@ class TestFind:
             ],
         )
         assert result.exit_code == 1
+
+
+class TestVscode:
+    """Tests for vscode command."""
+
+    def test_no_config(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Fails if config doesn't exist."""
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Config not found" in result.output
+
+    def test_generates_workspace_file(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Generates workspace file for a workspace."""
+        import json
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo-a")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        output_dir = test_env["config"].parent / "output"
+        output_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "-o",
+                str(output_dir),
+            ],
+        )
+        assert result.exit_code == 0
+
+        ws_file = output_dir / "workspace.code-workspace"
+        assert ws_file.exists()
+        data = json.loads(ws_file.read_text())
+        assert len(data["folders"]) == 1
+        assert data["folders"][0]["name"] == "repo-a"
+
+    def test_generates_from_category(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Generates workspace file filtered by category."""
+        import json
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="root-repo")]
+        )
+        ws.categories["tools"] = Category(
+            path="tools", entries=[RepoEntry(repo_name="my-tool")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        output_dir = test_env["config"].parent / "output"
+        output_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "tools",
+                "-o",
+                str(output_dir),
+            ],
+        )
+        assert result.exit_code == 0
+
+        ws_file = output_dir / "tools.code-workspace"
+        assert ws_file.exists()
+        data = json.loads(ws_file.read_text())
+        assert len(data["folders"]) == 1
+        assert data["folders"][0]["name"] == "my-tool"
+
+    def test_output_flag_overrides_config(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Output flag overrides config vscode_workspaces_path."""
+        config = Config(
+            code_path=test_env["code"],
+            vscode_workspaces_path=test_env["config"].parent / "config-default",
+        )
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        flag_dir = test_env["config"].parent / "flag-override"
+        flag_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "-o",
+                str(flag_dir),
+            ],
+        )
+        assert result.exit_code == 0
+        assert (flag_dir / "workspace.code-workspace").exists()
+
+    def test_config_key_used_as_default_output(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Uses config vscode_workspaces_path when no -o flag."""
+        default_dir = test_env["config"].parent / "default-output"
+
+        config = Config(
+            code_path=test_env["code"],
+            vscode_workspaces_path=default_dir,
+        )
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (default_dir / "workspace.code-workspace").exists()
+
+    def test_falls_back_to_cwd(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Falls back to current working directory when no -o and no config key."""
+        import json
+        import os
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        # Use a temp dir as cwd
+        cwd = test_env["config"].parent / "cwd-dir"
+        cwd.mkdir()
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(cwd)
+            result = runner.invoke(
+                main,
+                [
+                    "--config",
+                    str(test_env["config"]),
+                    "vscode",
+                    "workspace",
+                ],
+            )
+        finally:
+            os.chdir(original_cwd)
+
+        assert result.exit_code == 0
+        ws_file = cwd / "workspace.code-workspace"
+        assert ws_file.exists()
+        data = json.loads(ws_file.read_text())
+        assert data["folders"][0]["name"] == "repo1"
+
+    def test_error_on_unknown_workspace(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Shows error for unknown workspace name."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "nonexistent",
+                "-o",
+                str(test_env["config"].parent),
+            ],
+        )
+        assert result.exit_code == 1
+        assert "nonexistent" in result.output
+
+    def test_error_on_unknown_category(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Shows error for unknown category path."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "nonexistent",
+                "-o",
+                str(test_env["config"].parent),
+            ],
+        )
+        assert result.exit_code == 1
+        assert "nonexistent" in result.output
+
+    def test_dry_run(self, runner: CliRunner, test_env: dict[str, Path]) -> None:
+        """Dry run shows what would be generated without writing."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        output_dir = test_env["config"].parent / "output"
+        output_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "--dry-run",
+                "vscode",
+                "workspace",
+                "-o",
+                str(output_dir),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Would" in result.output or "workspace.code-workspace" in result.output
+        # File should NOT be created
+        assert not (output_dir / "workspace.code-workspace").exists()
+
+    def test_name_flag_overrides_filename(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Name flag overrides the generated filename."""
+        import json
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["claudeup"] = Category(
+            path="claudeup", entries=[RepoEntry(repo_name="my-repo")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        output_dir = test_env["config"].parent / "output"
+        output_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "claudeup",
+                "-o",
+                str(output_dir),
+                "--name",
+                "claudeup",
+            ],
+        )
+        assert result.exit_code == 0
+
+        ws_file = output_dir / "claudeup.code-workspace"
+        assert ws_file.exists()
+        data = json.loads(ws_file.read_text())
+        assert len(data["folders"]) == 1
+
+    def test_name_flag_adds_extension(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Name flag adds .code-workspace extension if not provided."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        output_dir = test_env["config"].parent / "output"
+        output_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "-o",
+                str(output_dir),
+                "--name",
+                "my-custom-name.code-workspace",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (output_dir / "my-custom-name.code-workspace").exists()
+
+    def test_help_text(self, runner: CliRunner) -> None:
+        """Shows help text."""
+        result = runner.invoke(main, ["vscode", "--help"])
+        assert result.exit_code == 0
+        assert "workspace" in result.output.lower()

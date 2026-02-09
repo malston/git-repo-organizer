@@ -101,10 +101,11 @@ uv tool install -e --force .    # Editable global install (reflects source chang
 
 ## Config Format
 
-Any top-level key except `code` is treated as a workspace:
+Any top-level key except reserved keys (`code`, `vscode_workspaces`) is treated as a workspace:
 
 ```yaml
 code: ~/code
+vscode_workspaces: ~/vscode-workspaces # Optional: default output for gro vscode
 workspace: # Simple name -> ~/workspace
   .: # Root category - symlinks directly to workspace/
     - repo1
@@ -157,6 +158,8 @@ workspace/vendor/projects/
 - `gro find [pattern]` - Interactive fuzzy search for repos
   - `--list` - Print matches without interactive selection
   - `--path` - Output only path (for `cd "$(gro find --path)"`)
+- `gro vscode <workspace> [category]` - Generate VS Code `.code-workspace` file
+  - `-o` - Output directory (default: `vscode_workspaces` config key, then cwd)
 - `gro fmt` - Format config file (sorts categories and repos alphabetically)
 - `gro cat ls` - List all categories with repo counts
 - `gro cat add <path>` - Add a new category (`-w` to specify workspace)

@@ -474,3 +474,75 @@ class TestValidateConfig:
 
         warnings = validate_config(config)
         assert any("duplicate symlink name" in w.lower() for w in warnings)
+
+
+class TestVscodeWorkspacesConfig:
+    """Tests for vscode_workspaces config key."""
+
+    def test_parses_vscode_workspaces_path(self) -> None:
+        """Parses vscode_workspaces key into Config field."""
+        data = {
+            "code": "~/code",
+            "vscode_workspaces": "~/vscode-workspaces",
+            "workspace": {".": ["repo1"]},
+        }
+        config = parse_config(data)
+        assert config.vscode_workspaces_path == Path.home() / "vscode-workspaces"
+
+    def test_vscode_workspaces_not_treated_as_workspace(self) -> None:
+        """vscode_workspaces key is not treated as a workspace."""
+        data = {
+            "code": "~/code",
+            "vscode_workspaces": "~/vscode-workspaces",
+            "workspace": {".": ["repo1"]},
+        }
+        config = parse_config(data)
+        assert "vscode_workspaces" not in config.workspaces
+        assert len(config.workspaces) == 1
+        assert "workspace" in config.workspaces
+
+    def test_vscode_workspaces_defaults_to_none(self) -> None:
+        """Config without vscode_workspaces has None for the field."""
+        data = {
+            "code": "~/code",
+            "workspace": {".": ["repo1"]},
+        }
+        config = parse_config(data)
+        assert config.vscode_workspaces_path is None
+
+    def test_serializes_vscode_workspaces(self) -> None:
+        """Serialization includes vscode_workspaces when set."""
+        ws = Workspace(path=Path.home() / "workspace")
+        ws.categories["."] = Category(path=".", entries=[RepoEntry(repo_name="repo1")])
+        config = Config(
+            code_path=Path.home() / "code",
+            workspaces={"workspace": ws},
+            vscode_workspaces_path=Path.home() / "vscode-workspaces",
+        )
+        data = serialize_config(config)
+        assert "vscode_workspaces" in data
+        assert data["vscode_workspaces"] == "~/vscode-workspaces"
+
+    def test_omits_vscode_workspaces_when_none(self) -> None:
+        """Serialization omits vscode_workspaces when None."""
+        ws = Workspace(path=Path.home() / "workspace")
+        config = Config(
+            code_path=Path.home() / "code",
+            workspaces={"workspace": ws},
+        )
+        data = serialize_config(config)
+        assert "vscode_workspaces" not in data
+
+    def test_roundtrip_with_vscode_workspaces(self) -> None:
+        """Config with vscode_workspaces survives roundtrip."""
+        original_data = {
+            "code": "~/code",
+            "vscode_workspaces": "~/vscode-workspaces",
+            "workspace": {".": ["repo1"]},
+        }
+        config = parse_config(original_data)
+        serialized = serialize_config(config)
+        restored = parse_config(serialized)
+
+        assert restored.vscode_workspaces_path == Path.home() / "vscode-workspaces"
+        assert "workspace" in restored.workspaces
