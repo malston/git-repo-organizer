@@ -1303,7 +1303,7 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
     "--output",
     "-o",
     "output_dir",
-    type=click.Path(path_type=Path),
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
     help="Output directory for workspace file",
 )
 @click.option(

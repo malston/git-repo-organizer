@@ -72,16 +72,8 @@ def generate_workspace_data(
         categories = workspace.categories
 
     # Compute relative path from output_dir to workspace path
-    try:
-        rel_to_ws = PurePosixPath(output_dir.resolve().relative_to(
-            workspace.path.resolve()
-        ))
-        # This means output_dir is inside workspace -- unlikely but handle it
-        prefix = PurePosixPath("/".join([".."] * len(rel_to_ws.parts))) / workspace.path.name
-    except ValueError:
-        # output_dir is not inside workspace path -- compute relative path
-        rel = PurePosixPath(Path(*_relative_parts(output_dir.resolve(), workspace.path.resolve())))
-        prefix = rel
+    rel_parts = _relative_parts(output_dir.resolve(), workspace.path.resolve())
+    prefix = PurePosixPath(*rel_parts) if rel_parts else PurePosixPath(".")
 
     # Collect folders, deduplicating by symlink_name
     seen: set[str] = set()

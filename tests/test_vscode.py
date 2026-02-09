@@ -159,7 +159,7 @@ class TestGenerateWorkspaceData:
         """Error message lists available workspace names."""
         config = self._make_config(tmp_path)
         output_dir = tmp_path / "vscode-workspaces"
-        with pytest.raises(ValueError, match="workspace"):
+        with pytest.raises(ValueError, match="Available: workspace"):
             generate_workspace_data(config, "nonexistent", output_dir=output_dir)
 
     def test_unknown_category_raises(self, tmp_path: Path) -> None:
@@ -179,6 +179,42 @@ class TestGenerateWorkspaceData:
             generate_workspace_data(
                 config, "workspace", category_path="nonexistent", output_dir=output_dir
             )
+
+    def test_output_dir_is_workspace_path(self, tmp_path: Path) -> None:
+        """Folder paths are correct when output_dir equals workspace path."""
+        code_path = tmp_path / "code"
+        ws = Workspace(path=tmp_path / "workspace")
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="my-repo")],
+        )
+        ws.categories["tools"] = Category(
+            path="tools",
+            entries=[RepoEntry(repo_name="my-tool")],
+        )
+        config = Config(code_path=code_path, workspaces={"workspace": ws})
+
+        # output_dir IS the workspace directory
+        data = generate_workspace_data(config, "workspace", output_dir=ws.path)
+        folders = {f["name"]: f["path"] for f in data["folders"]}
+        assert folders["my-repo"] == "my-repo"
+        assert folders["my-tool"] == "tools/my-tool"
+
+    def test_output_dir_inside_workspace(self, tmp_path: Path) -> None:
+        """Folder paths are correct when output_dir is inside workspace."""
+        code_path = tmp_path / "code"
+        ws = Workspace(path=tmp_path / "workspace")
+        ws.categories["."] = Category(
+            path=".",
+            entries=[RepoEntry(repo_name="my-repo")],
+        )
+        config = Config(code_path=code_path, workspaces={"workspace": ws})
+
+        # output_dir is a subdirectory of the workspace
+        output_dir = ws.path / "subdir"
+        data = generate_workspace_data(config, "workspace", output_dir=output_dir)
+        folders = {f["name"]: f["path"] for f in data["folders"]}
+        assert folders["my-repo"] == "../my-repo"
 
     def test_aliased_repo_uses_symlink_name(self, tmp_path: Path) -> None:
         """Aliased repos use the alias (symlink_name) as the folder name."""
