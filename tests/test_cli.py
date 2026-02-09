@@ -2346,7 +2346,7 @@ class TestVscode:
         )
         assert result.exit_code == 0
 
-        ws_file = output_dir / "workspace-tools.code-workspace"
+        ws_file = output_dir / "tools.code-workspace"
         assert ws_file.exists()
         data = json.loads(ws_file.read_text())
         assert len(data["folders"]) == 1
@@ -2532,6 +2532,75 @@ class TestVscode:
         assert "Would" in result.output or "workspace.code-workspace" in result.output
         # File should NOT be created
         assert not (output_dir / "workspace.code-workspace").exists()
+
+    def test_name_flag_overrides_filename(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Name flag overrides the generated filename."""
+        import json
+
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["claudeup"] = Category(
+            path="claudeup", entries=[RepoEntry(repo_name="my-repo")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        output_dir = test_env["config"].parent / "output"
+        output_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "claudeup",
+                "-o",
+                str(output_dir),
+                "--name",
+                "claudeup",
+            ],
+        )
+        assert result.exit_code == 0
+
+        ws_file = output_dir / "claudeup.code-workspace"
+        assert ws_file.exists()
+        data = json.loads(ws_file.read_text())
+        assert len(data["folders"]) == 1
+
+    def test_name_flag_adds_extension(
+        self, runner: CliRunner, test_env: dict[str, Path]
+    ) -> None:
+        """Name flag adds .code-workspace extension if not provided."""
+        config = Config(code_path=test_env["code"])
+        ws = Workspace(path=test_env["workspace"])
+        ws.categories["."] = Category(
+            path=".", entries=[RepoEntry(repo_name="repo1")]
+        )
+        config.workspaces["workspace"] = ws
+        save_config(config, test_env["config"])
+
+        output_dir = test_env["config"].parent / "output"
+        output_dir.mkdir()
+
+        result = runner.invoke(
+            main,
+            [
+                "--config",
+                str(test_env["config"]),
+                "vscode",
+                "workspace",
+                "-o",
+                str(output_dir),
+                "--name",
+                "my-custom-name.code-workspace",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (output_dir / "my-custom-name.code-workspace").exists()
 
     def test_help_text(self, runner: CliRunner) -> None:
         """Shows help text."""

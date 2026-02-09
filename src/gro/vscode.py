@@ -25,9 +25,9 @@ def workspace_file_name(ws_name: str, category_path: str | None = None) -> str:
         return f"{ws_name}.code-workspace"
     if category_path == ".":
         return f"{ws_name}-root.code-workspace"
-    # Replace slashes with dashes
+    # Use category name as filename, replacing slashes with dashes
     cat_slug = category_path.replace("/", "-")
-    return f"{ws_name}-{cat_slug}.code-workspace"
+    return f"{cat_slug}.code-workspace"
 
 
 def generate_workspace_data(

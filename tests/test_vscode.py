@@ -19,25 +19,25 @@ class TestWorkspaceFileName:
         assert workspace_file_name("workspace") == "workspace.code-workspace"
 
     def test_root_category(self) -> None:
-        """Root category '.' becomes 'root' in filename."""
+        """Root category '.' uses workspace name with root suffix."""
         assert workspace_file_name("workspace", ".") == "workspace-root.code-workspace"
 
     def test_simple_category(self) -> None:
-        """Simple category path appended with dash."""
-        assert workspace_file_name("workspace", "tools") == "workspace-tools.code-workspace"
+        """Category name used as filename."""
+        assert workspace_file_name("workspace", "tools") == "tools.code-workspace"
 
     def test_nested_category(self) -> None:
         """Nested category slashes become dashes."""
         assert (
             workspace_file_name("workspace", "vmware/vsphere")
-            == "workspace-vmware-vsphere.code-workspace"
+            == "vmware-vsphere.code-workspace"
         )
 
     def test_deeply_nested_category(self) -> None:
         """Multiple slashes all become dashes."""
         assert (
             workspace_file_name("workspace", "a/b/c")
-            == "workspace-a-b-c.code-workspace"
+            == "a-b-c.code-workspace"
         )
 
 

@@ -1306,12 +1306,19 @@ def find(ctx: Context, pattern: str | None, list_mode: bool, path_mode: bool) ->
     type=click.Path(path_type=Path),
     help="Output directory for workspace file",
 )
+@click.option(
+    "--name",
+    "-n",
+    "file_name",
+    help="Override generated filename (without .code-workspace extension)",
+)
 @pass_context
 def vscode(
     ctx: Context,
     workspace_name: str,
     category_path: str | None,
     output_dir: Path | None,
+    file_name: str | None,
 ) -> None:
     """Generate VS Code workspace file from config.
 
@@ -1337,7 +1344,12 @@ def vscode(
         console.print(f"[red]Error:[/red] {e}")
         raise SystemExit(1) from None
 
-    filename = workspace_file_name(workspace_name, category_path)
+    if file_name is not None:
+        if not file_name.endswith(".code-workspace"):
+            file_name = f"{file_name}.code-workspace"
+        filename = file_name
+    else:
+        filename = workspace_file_name(workspace_name, category_path)
     output_path = output_dir / filename
 
     if ctx.dry_run:
