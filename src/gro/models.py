@@ -103,6 +103,7 @@ class Config:
 
     code_path: Path  # Where actual repos are cloned
     workspaces: dict[str, Workspace] = field(default_factory=dict)
+    vscode_workspaces_path: Path | None = None
 
     def get_workspace(self, name: str) -> Workspace | None:
         """Get a workspace by name."""

@@ -100,8 +100,15 @@ def parse_config(data: dict[str, Any]) -> Config:
     # Code path defaults to ~/code
     code_path = expand_path(data.get("code", "~/code"))
 
-    # Collect workspace keys (everything except 'code')
-    workspace_keys = [k for k in data if k != "code"]
+    # Reserved keys that are not workspace definitions
+    reserved_keys = {"code", "vscode_workspaces"}
+
+    # Parse vscode_workspaces path if present
+    vscode_ws = data.get("vscode_workspaces")
+    vscode_workspaces_path = expand_path(vscode_ws) if vscode_ws else None
+
+    # Collect workspace keys (everything except reserved keys)
+    workspace_keys = [k for k in data if k not in reserved_keys]
 
     # Build workspace paths and check for basename collisions
     basenames: dict[str, tuple[str, Path]] = {}  # basename -> (key, path)
@@ -152,7 +159,11 @@ def parse_config(data: dict[str, Any]) -> Config:
 
         workspaces[ws_name] = workspace
 
-    return Config(code_path=code_path, workspaces=workspaces)
+    return Config(
+        code_path=code_path,
+        workspaces=workspaces,
+        vscode_workspaces_path=vscode_workspaces_path,
+    )
 
 
 def save_config(config: Config, path: Path | None = None) -> None:
@@ -222,6 +233,9 @@ def serialize_config(config: Config) -> dict[str, Any]:
             return str(p)
 
     data["code"] = path_str(config.code_path)
+
+    if config.vscode_workspaces_path is not None:
+        data["vscode_workspaces"] = path_str(config.vscode_workspaces_path)
 
     # Workspace configurations as top-level keys
     for workspace in config.workspaces.values():
